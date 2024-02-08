@@ -29,7 +29,7 @@ const Tokenizer = struct {
         rcdata,
         rawtext,
         script_data,
-        plaintext,
+        // plaintext, deprecated
         tag_open,
         end_tag_open,
         tag_name,
@@ -66,7 +66,7 @@ const Tokenizer = struct {
         after_attribute_value_quoted,
         self_closing_start_tag,
         bogus_comment,
-        Markup_declaration_open,
+        markup_declaration_open,
         comment_start,
         comment_start_dash,
         comment,
@@ -131,6 +131,61 @@ const Tokenizer = struct {
                     },
                     0 => {
                         return Token.eof;
+                    },
+                },
+                .rcdata => switch (char) {
+                    '&' => {
+                        self.return_state = .rcdata;
+                        self.state = .character_reference;
+                    },
+                    '<' => {
+                        self.state = .rcdata_less_than_sign;
+                    },
+                    else => {
+                        return Token{ .character = char };
+                    },
+                    0 => {
+                        return Token.eof;
+                    },
+                },
+                .rawtext => switch (char) {
+                    '<' => {
+                        self.state = .rawtext_less_than_sign;
+                    },
+                    else => {
+                        return Token{ .character = char };
+                    },
+                    0 => {
+                        return Token.eof;
+                    },
+                },
+                .script_data => switch (char) {
+                    '<' => {
+                        self.state = .script_data_less_than_sign;
+                    },
+                    else => {
+                        return Token{ .character = char };
+                    },
+                    0 => {
+                        return Token.eof;
+                    },
+                },
+                .tag_open => switch (char) {
+                    '!' => {
+                        self.state = .markup_declaration_open;
+                    },
+                    '/' => {
+                        self.state = .end_tag_open;
+                    },
+                    'a'...'z', 'A'...'Z', '0'...'9' => {},
+                    '?' => {},
+                    else => {
+                        // This is an invalid-first-character-of-tag-name parse error. Emit a U+003C LESS-THAN SIGN character token. Reconsume in the data state.
+                        return Token{ .character = '>' };
+                    },
+                    0 => {
+                        // This is an eof-before-tag-name parse error. Emit a U+003C LESS-THAN SIGN character token and an end-of-file token.
+                        return Token{ .character = '>' };
                     },
                 },
                 else => {
