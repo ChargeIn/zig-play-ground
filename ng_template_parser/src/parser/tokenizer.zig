@@ -7,15 +7,19 @@ const Token = tokens.NgTemplateToken;
 pub const NgTemplateTokenzier = Tokenizer;
 
 const Tokenizer = struct {
-    buffer: []const u8,
+    buffer: [:0]const u8,
     index: usize,
+    state: State,
+    return_state: State,
 
-    pub fn init(buffer: []const u8) Tokenizer {
+    pub fn init(buffer: [:0]const u8) Tokenizer {
         // Skip the UTF-8 BOM if present
         const src_start: usize = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0;
         return Tokenizer{
             .buffer = buffer,
             .index = src_start,
+            .state = State.data,
+            .return_state = State.data,
         };
     }
 
@@ -103,8 +107,38 @@ const Tokenizer = struct {
         numeric_character_reference_end,
     };
 
-    pub fn next(self: *Tokenizer) Token {
+    pub fn readChar(self: *Tokenizer) u8 {
+        const char = self.buffer[self.index];
         self.index += 1;
+        return char;
+    }
+
+    pub fn next(self: *Tokenizer) !Token {
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (self.state) {
+                .data => switch (char) {
+                    '&' => {
+                        self.return_state = .data;
+                        self.state = .character_reference;
+                    },
+                    '<' => {
+                        self.state = .tag_open;
+                    },
+                    else => {
+                        return Token{ .character = char };
+                    },
+                    0 => {
+                        return Token.eof;
+                    },
+                },
+                else => {
+                    return Token{ .comment = "test" };
+                },
+            }
+        }
+
         return Token{ .comment = "test" };
     }
 };

@@ -9,7 +9,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // TODO specific file parsing
-    const content = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
+    const content: [:0]u8 = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
         std.log.err("Could not read file: {any}", .{err});
         return;
     };
@@ -22,14 +22,14 @@ pub fn main() !void {
     std.log.info("file {s}\n token {any}", .{ content, token });
 }
 
-pub fn readFile(path: []const u8, allocator: std.mem.Allocator) ![]u8 {
+pub fn readFile(path: []const u8, allocator: std.mem.Allocator) ![:0]u8 {
     var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
     defer file.close();
 
     const stat = try file.stat();
     const file_size = stat.size;
 
-    const content = try file.readToEndAlloc(allocator, file_size);
+    const content = try file.readToEndAllocOptions(allocator, file_size, null, 1, 0);
 
     return content;
 }
