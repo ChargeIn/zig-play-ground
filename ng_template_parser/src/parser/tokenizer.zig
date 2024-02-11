@@ -6,11 +6,64 @@ const Token = tokens.NgTemplateToken;
 
 pub const NgTemplateTokenzier = Tokenizer;
 
+const NgTemplateTokenizerErrors = error{
+    AbruptClosingOfEmptyComment,
+    AbruptDoctypePublicIdentifier,
+    AbruptDoctypeSystemIdentifier,
+    AbsenceOfDigitsInNumericCharacterReference,
+    CdataInHtmlContent,
+    CharacterReferenceOutsideUnicodeRange,
+    ControlCharacterInInputStream,
+    ControlCharacterReference,
+    DuplicateAttribute,
+    EndTagWithAttributes,
+    EndTagWithTrailingSolidus,
+    EofBeforeTagName,
+    EofInCdata,
+    EofInComment,
+    EofInDoctype,
+    EofInScriptHtmlCommentLikeText,
+    EofInTag,
+    IncorrectlyClosedComment,
+    IncorrectlyOpenedComment,
+    InvalidCharacterSequenceAfterDoctypeName,
+    InvalidFirstCharacterOfTagName,
+    MissingAttributeValue,
+    MissingDoctypeName,
+    MissingDoctypePublicIdentifier,
+    MissingDoctypeSystemIdentifier,
+    MissingEndTagName,
+    MissingQuoteBeforeDoctypePublicIdentifier,
+    MissingQuoteBeforeDoctypeSystemIdentifier,
+    MissingSemicolonAfterCharacterReference,
+    MissingWhitespaceAfterDoctypePublicKeyword,
+    MissingWhitespaceAfterDoctypeSystemKeyword,
+    MissingWhitespaceBeforeDoctypeName,
+    MissingWhitespaceBetweenAttributes,
+    MissingWhitespaceBetweenDoctypePublicAndSystemIdentifiers,
+    NestedComment,
+    NoncharacterCharacterReference,
+    NoncharacterInInputStream,
+    NonVoidHtmlElementStartTagWithTrailingSolidus,
+    NullCharacterReference,
+    SurrogateCharacterReference,
+    SurrogateInInputStream,
+    UnexpectedCharacterAfterDoctypeSystemIdentifier,
+    UnexpectedCharacterInAttributeName,
+    UnexpectedCharacterInUnquotedAttributeValue,
+    UnexpectedEqualsSignBeforeAttributeName,
+    UnexpectedNullCharacter,
+    UnexpectedQuestionMarkInsteadOfTagName,
+    UnexpectedSolidusInTag,
+    UnknownNamedCharacterReference,
+};
+
 const Tokenizer = struct {
     buffer: [:0]const u8,
     index: usize,
     state: State,
     return_state: State,
+    error_state: ?NgTemplateTokenizerErrors,
 
     pub fn init(buffer: [:0]const u8) Tokenizer {
         // Skip the UTF-8 BOM if present
@@ -20,6 +73,7 @@ const Tokenizer = struct {
             .index = src_start,
             .state = State.data,
             .return_state = State.data,
+            .error_state = null,
         };
     }
 
@@ -126,11 +180,11 @@ const Tokenizer = struct {
                     '<' => {
                         self.state = .tag_open;
                     },
-                    else => {
-                        return Token{ .character = char };
-                    },
                     0 => {
                         return Token.eof;
+                    },
+                    else => {
+                        return Token{ .character = char };
                     },
                 },
                 .rcdata => switch (char) {
@@ -141,33 +195,33 @@ const Tokenizer = struct {
                     '<' => {
                         self.state = .rcdata_less_than_sign;
                     },
-                    else => {
-                        return Token{ .character = char };
-                    },
                     0 => {
                         return Token.eof;
+                    },
+                    else => {
+                        return Token{ .character = char };
                     },
                 },
                 .rawtext => switch (char) {
                     '<' => {
                         self.state = .rawtext_less_than_sign;
                     },
-                    else => {
-                        return Token{ .character = char };
-                    },
                     0 => {
                         return Token.eof;
+                    },
+                    else => {
+                        return Token{ .character = char };
                     },
                 },
                 .script_data => switch (char) {
                     '<' => {
                         self.state = .script_data_less_than_sign;
                     },
-                    else => {
-                        return Token{ .character = char };
-                    },
                     0 => {
                         return Token.eof;
+                    },
+                    else => {
+                        return Token{ .character = char };
                     },
                 },
                 .tag_open => switch (char) {
@@ -177,15 +231,20 @@ const Tokenizer = struct {
                     '/' => {
                         self.state = .end_tag_open;
                     },
-                    'a'...'z', 'A'...'Z', '0'...'9' => {},
-                    '?' => {},
-                    else => {
-                        // This is an invalid-first-character-of-tag-name parse error. Emit a U+003C LESS-THAN SIGN character token. Reconsume in the data state.
-                        return Token{ .character = '>' };
+                    'a'...'z', 'A'...'Z', '0'...'9' => {
+                        self.state = .tag_name;
+                    },
+                    '?' => {
+                        self.error_state = NgTemplateTokenizerErrors.UnexpectedQuestionMarkInsteadOfTagName;
+                        self.state = .bogus_comment;
                     },
                     0 => {
-                        // This is an eof-before-tag-name parse error. Emit a U+003C LESS-THAN SIGN character token and an end-of-file token.
+                        self.error_state = NgTemplateTokenizerErrors.EofBeforeTagName;
                         return Token{ .character = '>' };
+                    },
+                    else => {
+                        self.error_state = NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
+                        self.state = .data;
                     },
                 },
                 else => {
