@@ -6,6 +6,11 @@ const Token = tokens.NgTemplateToken;
 
 pub const NgTemplateTokenzier = Tokenizer;
 
+const TAB = 0x09;
+const LINE_FEED = 0x0A;
+const FORM_FEED = 0x0C;
+const SPACE = 0x20;
+
 const NgTemplateTokenizerErrors = error{
     AbruptClosingOfEmptyComment,
     AbruptDoctypePublicIdentifier,
@@ -167,9 +172,16 @@ const Tokenizer = struct {
         return char;
     }
 
+    pub inline fn reconsume_in(self: *Tokenizer, state: State) void {
+        self.index -= 1;
+        self.state = state;
+    }
+
     pub fn next(self: *Tokenizer) !Token {
+        var token: Token = Token.eof;
+
         while (true) : (self.index += 1) {
-            const char = self.buffer[self.index];
+            var char = self.buffer[self.index];
 
             switch (self.state) {
                 .data => switch (char) {
@@ -232,11 +244,48 @@ const Tokenizer = struct {
                         self.state = .end_tag_open;
                     },
                     'a'...'z', 'A'...'Z', '0'...'9' => {
-                        self.state = .tag_name;
+                        var len: usize = 0;
+
+                        while (true) {
+                            switch (char) {
+                                TAB, LINE_FEED, FORM_FEED, SPACE => {
+                                    self.state = .before_attribute_name;
+                                    break;
+                                },
+                                '/' => {
+                                    self.state = .self_closing_start_tag;
+                                    break;
+                                },
+                                '>' => {
+                                    self.state = .data;
+                                    return token;
+                                },
+                                0 => {
+                                    self.error_state = NgTemplateTokenizerErrors.EofInTag;
+                                    return Token.eof;
+                                },
+                                else => {
+                                    len += 1;
+                                },
+                            }
+                            self.index += 1;
+                            char = self.buffer[self.index];
+                        }
+
+                        const start: usize = self.index - len;
+                        const attrs: []tokens.TagAttribute = &.{};
+
+                        token = Token{
+                            .start_tag = tokens.StartTag{
+                                .name = self.buffer[start..self.index],
+                                .self_closing = false,
+                                .attributes = attrs,
+                            },
+                        };
                     },
                     '?' => {
                         self.error_state = NgTemplateTokenizerErrors.UnexpectedQuestionMarkInsteadOfTagName;
-                        self.state = .bogus_comment;
+                        self.reconsume_in(.bogus_comment);
                     },
                     0 => {
                         self.error_state = NgTemplateTokenizerErrors.EofBeforeTagName;
@@ -244,7 +293,7 @@ const Tokenizer = struct {
                     },
                     else => {
                         self.error_state = NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
-                        self.state = .data;
+                        self.reconsume_in(.data);
                     },
                 },
                 else => {
