@@ -246,6 +246,7 @@ const Tokenizer = struct {
                     'a'...'z', 'A'...'Z', '0'...'9' => {
                         var len: usize = 0;
 
+                        // Note: we ignore upper and lower case letters here
                         while (true) {
                             switch (char) {
                                 TAB, LINE_FEED, FORM_FEED, SPACE => {
@@ -293,7 +294,64 @@ const Tokenizer = struct {
                     },
                     else => {
                         self.error_state = NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
+                        // TODO emit LESS THAN Sign
                         self.reconsume_in(.data);
+                    },
+                },
+                .end_tag_open => switch (char) {
+                    'a'...'z', 'A'...'Z', '0'...'9' => {
+                        var len: usize = 0;
+
+                        // Note: we ignore upper and lower case letters here
+                        while (true) {
+                            switch (char) {
+                                TAB, LINE_FEED, FORM_FEED, SPACE => {
+                                    self.state = .before_attribute_name;
+                                    break;
+                                },
+                                '/' => {
+                                    self.state = .self_closing_start_tag;
+                                    break;
+                                },
+                                '>' => {
+                                    self.state = .data;
+                                    return token;
+                                },
+                                0 => {
+                                    self.error_state = NgTemplateTokenizerErrors.EofInTag;
+                                    return Token.eof;
+                                },
+                                else => {
+                                    len += 1;
+                                },
+                            }
+                            self.index += 1;
+                            char = self.buffer[self.index];
+                        }
+
+                        const start: usize = self.index - len;
+                        const attrs: []tokens.TagAttribute = &.{};
+
+                        token = Token{
+                            .start_tag = tokens.StartTag{
+                                .name = self.buffer[start..self.index],
+                                .self_closing = false,
+                                .attributes = attrs,
+                            },
+                        };
+                    },
+                    '>' => {
+                        self.error_state = NgTemplateTokenizerErrors.MissingEndTagName;
+                        self.reconsume_in(.data);
+                    },
+                    0 => {
+                        self.error_state = NgTemplateTokenizerErrors.EofBeforeTagName;
+                        // TODO emit rest of the token
+                        return Token{ .character = '>' };
+                    },
+                    else => {
+                        self.error_state = NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
+                        self.reconsume_in(.bogus_comment);
                     },
                 },
                 else => {
