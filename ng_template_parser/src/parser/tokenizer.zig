@@ -61,14 +61,12 @@ const NgTemplateTokenizerErrors = error{
     UnexpectedQuestionMarkInsteadOfTagName,
     UnexpectedSolidusInTag,
     UnknownNamedCharacterReference,
+    UnsupportedTokenException,
 };
 
 const Tokenizer = struct {
     buffer: [:0]const u8,
     index: usize,
-    state: State,
-    return_state: State,
-    error_state: ?NgTemplateTokenizerErrors,
 
     pub fn init(buffer: [:0]const u8) Tokenizer {
         // Skip the UTF-8 BOM if present
@@ -76,290 +74,253 @@ const Tokenizer = struct {
         return Tokenizer{
             .buffer = buffer,
             .index = src_start,
-            .state = State.data,
-            .return_state = State.data,
-            .error_state = null,
         };
     }
 
-    // taken from https://html.spec.whatwg.org/multipage/parsing.html#tokenization
-    const State = enum {
-        data,
-        rcdata,
-        rawtext,
-        script_data,
-        // plaintext, deprecated
-        tag_open,
-        end_tag_open,
-        tag_name,
-        rcdata_less_than_sign,
-        rcdata_end_tag_open,
-        rcdata_end_tag_name,
-        rawtext_less_than_sign,
-        rawtext_end_tag_open,
-        rawtext_end_tag_name,
-        script_data_less_than_sign,
-        script_data_end_tag_open,
-        script_data_end_tag_name,
-        script_data_escape_start,
-        script_data_escape_start_dash,
-        script_data_escaped,
-        script_data_escaped_dash,
-        script_data_escaped_dash_dash,
-        script_data_escaped_less_than_sign,
-        script_data_escaped_end_tag_open,
-        script_data_escaped_end_tag_name,
-        script_data_double_escape_start,
-        script_data_double_escaped,
-        script_data_double_escaped_dash,
-        script_data_double_escaped_dash_dash,
-        script_data_double_escaped_less_than_sign,
-        script_data_double_escape_end,
-        before_attribute_name,
-        attribute_name,
-        after_attribute_name,
-        before_attribute_value,
-        attribute_value_double_quoted,
-        attribute_value_single_quoted,
-        attribute_value_unquoted,
-        after_attribute_value_quoted,
-        self_closing_start_tag,
-        bogus_comment,
-        markup_declaration_open,
-        comment_start,
-        comment_start_dash,
-        comment,
-        comment_less_than_sign,
-        comment_less_than_sign_bang,
-        comment_less_than_sign_bang_dash,
-        comment_less_than_sign_bang_dash_dash,
-        comment_end_dash,
-        comment_end,
-        comment_end_bang,
-        doctype,
-        before_doctype_name,
-        doctype_name,
-        after_doctype_name,
-        after_doctype_public_keyword,
-        before_doctype_public_identifier,
-        doctype_public_identifier_double_quoted,
-        doctype_public_identifier_single_quoted,
-        after_doctype_public_identifier,
-        between_doctype_public_and_system_identifiers,
-        after_doctype_system_keyword,
-        before_doctype_system_identifier,
-        doctype_system_identifier_double_quoted,
-        doctype_system_identifier_single_quoted,
-        after_doctype_system_identifier,
-        bogus_doctype,
-        cdata_section,
-        cdata_section_bracket,
-        cdata_section_end,
-        character_reference,
-        named_character_reference,
-        ambiguous_ampersand,
-        numeric_character_reference,
-        hexadecimal_character_reference_start,
-        decimal_character_reference_start,
-        hexadecimal_character_reference,
-        decimal_character_reference,
-        numeric_character_reference_end,
-    };
-
-    pub fn readChar(self: *Tokenizer) u8 {
+    // Note: To optimize we assume the html is correct, otherwise the tokenizer will emit eof and set the error state
+    pub fn next(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
         const char = self.buffer[self.index];
+
+        switch (char) {
+            '<' => {
+                return self.parse_tag(allocator);
+            },
+            0 => {
+                return Token.eof;
+            },
+            else => {
+                return self.parse_text();
+            },
+        }
+    }
+
+    pub fn parse_text(self: *Tokenizer) Token {
+        std.log.info("Started parsing text: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        var char = self.buffer[self.index];
+        const start = self.index;
+
+        while (char != '<' and char != 0) {
+            self.index += 1;
+            char = self.buffer[self.index];
+        }
+
+        return Token{ .text = self.buffer[start..self.index] };
+    }
+
+    pub fn parse_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
+        std.log.info("Started parsing tag : Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        // skip '<' token
         self.index += 1;
-        return char;
+
+        var char = self.buffer[self.index];
+
+        switch (char) {
+            'A'...'Z', 'a'...'z' => {
+                return self.parse_open_tag(allocator);
+            },
+            '!' => {
+                // TODO
+            },
+            '/' => {
+                return self.parse_closing_tag();
+            },
+            '?' => {
+                return NgTemplateTokenizerErrors.UnexpectedQuestionMarkInsteadOfTagName;
+            },
+            0 => {
+                return NgTemplateTokenizerErrors.EofBeforeTagName;
+            },
+            else => {
+                return NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
+            },
+        }
+
+        return Token.eof;
     }
 
-    pub inline fn reconsume_in(self: *Tokenizer, state: State) void {
-        self.index -= 1;
-        self.state = state;
+    pub fn parse_open_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
+        std.log.info("Started parsing open tag: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        const name = try self.parse_tag_name();
+        const attributes = try self.parse_attributes(allocator);
+        var self_closing = false;
+
+        if (self.buffer[self.index] == '/') {
+            self_closing = true;
+            self.index += 1;
+        }
+
+        if (self.buffer[self.index] != '>') {
+            if (self.buffer[self.index] == 0) {
+                return NgTemplateTokenizerErrors.EofInTag;
+            } else {
+                return NgTemplateTokenizerErrors.UnexpectedSolidusInTag;
+            }
+        }
+        self.index += 1;
+
+        return Token{ .start_tag = tokens.StartTag.init(name, self_closing, attributes) };
     }
 
-    pub fn next(self: *Tokenizer) !Token {
-        var token: Token = Token.eof;
+    pub fn parse_closing_tag(self: *Tokenizer) !Token {
+        std.log.info("Started parsing closing tag: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        // skip '/' token
+        self.index += 1;
+
+        const name = try self.parse_tag_name();
 
         while (true) : (self.index += 1) {
-            var char = self.buffer[self.index];
-
-            switch (self.state) {
-                .data => switch (char) {
-                    '&' => {
-                        self.return_state = .data;
-                        self.state = .character_reference;
-                    },
-                    '<' => {
-                        self.state = .tag_open;
-                    },
-                    0 => {
-                        return Token.eof;
-                    },
-                    else => {
-                        return Token{ .character = char };
-                    },
+            const char = self.buffer[self.index];
+            switch (char) {
+                TAB, LINE_FEED, FORM_FEED, SPACE => {
+                    // ignore
                 },
-                .rcdata => switch (char) {
-                    '&' => {
-                        self.return_state = .rcdata;
-                        self.state = .character_reference;
-                    },
-                    '<' => {
-                        self.state = .rcdata_less_than_sign;
-                    },
-                    0 => {
-                        return Token.eof;
-                    },
-                    else => {
-                        return Token{ .character = char };
-                    },
+                '>' => {
+                    self.index += 1;
+                    return Token{ .end_tag = tokens.EndTag.init(name) };
                 },
-                .rawtext => switch (char) {
-                    '<' => {
-                        self.state = .rawtext_less_than_sign;
-                    },
-                    0 => {
-                        return Token.eof;
-                    },
-                    else => {
-                        return Token{ .character = char };
-                    },
-                },
-                .script_data => switch (char) {
-                    '<' => {
-                        self.state = .script_data_less_than_sign;
-                    },
-                    0 => {
-                        return Token.eof;
-                    },
-                    else => {
-                        return Token{ .character = char };
-                    },
-                },
-                .tag_open => switch (char) {
-                    '!' => {
-                        self.state = .markup_declaration_open;
-                    },
-                    '/' => {
-                        self.state = .end_tag_open;
-                    },
-                    'a'...'z', 'A'...'Z', '0'...'9' => {
-                        var len: usize = 0;
-
-                        // Note: we ignore upper and lower case letters here
-                        while (true) {
-                            switch (char) {
-                                TAB, LINE_FEED, FORM_FEED, SPACE => {
-                                    self.state = .before_attribute_name;
-                                    break;
-                                },
-                                '/' => {
-                                    self.state = .self_closing_start_tag;
-                                    break;
-                                },
-                                '>' => {
-                                    self.state = .data;
-                                    return token;
-                                },
-                                0 => {
-                                    self.error_state = NgTemplateTokenizerErrors.EofInTag;
-                                    return Token.eof;
-                                },
-                                else => {
-                                    len += 1;
-                                },
-                            }
-                            self.index += 1;
-                            char = self.buffer[self.index];
-                        }
-
-                        const start: usize = self.index - len;
-                        const attrs: []tokens.TagAttribute = &.{};
-
-                        token = Token{
-                            .start_tag = tokens.StartTag{
-                                .name = self.buffer[start..self.index],
-                                .self_closing = false,
-                                .attributes = attrs,
-                            },
-                        };
-                    },
-                    '?' => {
-                        self.error_state = NgTemplateTokenizerErrors.UnexpectedQuestionMarkInsteadOfTagName;
-                        self.reconsume_in(.bogus_comment);
-                    },
-                    0 => {
-                        self.error_state = NgTemplateTokenizerErrors.EofBeforeTagName;
-                        return Token{ .character = '>' };
-                    },
-                    else => {
-                        self.error_state = NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
-                        // TODO emit LESS THAN Sign
-                        self.reconsume_in(.data);
-                    },
-                },
-                .end_tag_open => switch (char) {
-                    'a'...'z', 'A'...'Z', '0'...'9' => {
-                        var len: usize = 0;
-
-                        // Note: we ignore upper and lower case letters here
-                        while (true) {
-                            switch (char) {
-                                TAB, LINE_FEED, FORM_FEED, SPACE => {
-                                    self.state = .before_attribute_name;
-                                    break;
-                                },
-                                '/' => {
-                                    self.state = .self_closing_start_tag;
-                                    break;
-                                },
-                                '>' => {
-                                    self.state = .data;
-                                    return token;
-                                },
-                                0 => {
-                                    self.error_state = NgTemplateTokenizerErrors.EofInTag;
-                                    return Token.eof;
-                                },
-                                else => {
-                                    len += 1;
-                                },
-                            }
-                            self.index += 1;
-                            char = self.buffer[self.index];
-                        }
-
-                        const start: usize = self.index - len;
-                        const attrs: []tokens.TagAttribute = &.{};
-
-                        token = Token{
-                            .start_tag = tokens.StartTag{
-                                .name = self.buffer[start..self.index],
-                                .self_closing = false,
-                                .attributes = attrs,
-                            },
-                        };
-                    },
-                    '>' => {
-                        self.error_state = NgTemplateTokenizerErrors.MissingEndTagName;
-                        self.reconsume_in(.data);
-                    },
-                    0 => {
-                        self.error_state = NgTemplateTokenizerErrors.EofBeforeTagName;
-                        // TODO emit rest of the token
-                        return Token{ .character = '>' };
-                    },
-                    else => {
-                        self.error_state = NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
-                        self.reconsume_in(.bogus_comment);
-                    },
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
                 },
                 else => {
-                    return Token{ .comment = "test" };
+                    return NgTemplateTokenizerErrors.UnsupportedTokenException;
+                },
+            }
+        }
+    }
+
+    // Note: Assumes that the first character is ASCII alpha
+    pub fn parse_tag_name(self: *Tokenizer) ![]const u8 {
+        std.log.info("Started parsing tag name: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        const start = self.index;
+
+        var char: u8 = 0;
+
+        // parse name
+        while (true) : (self.index += 1) {
+            char = self.buffer[self.index];
+
+            switch (char) {
+                TAB, LINE_FEED, FORM_FEED, SPACE, '/', '>' => {
+                    break;
+                },
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
+                },
+                else => {},
+            }
+        }
+
+        return self.buffer[start..self.index];
+    }
+
+    pub fn parse_attributes(self: *Tokenizer, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(tokens.Attribute) {
+        std.log.info("Started parsing attributes: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        var attribute_list = std.ArrayListUnmanaged(tokens.Attribute){};
+
+        var char: u8 = 0;
+
+        while (true) : (self.index += 1) {
+            char = self.buffer[self.index];
+
+            switch (char) {
+                '>', '/' => {
+                    break;
+                },
+                TAB, LINE_FEED, FORM_FEED, SPACE => {
+                    // ignore
+                },
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
+                },
+                '=' => {
+                    return NgTemplateTokenizerErrors.UnexpectedEqualsSignBeforeAttributeName;
+                },
+                else => {
+                    const attr = try self.parse_attribute();
+                    try attribute_list.append(allocator, attr);
                 },
             }
         }
 
-        return Token{ .comment = "test" };
+        return attribute_list;
+    }
+
+    pub fn parse_attribute(self: *Tokenizer) !tokens.Attribute {
+        std.log.info("Started parsing attribute: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+
+        return tokens.Attribute.init("name", "value");
     }
 };
+
+// ----------------------------------------------------------------
+//                      TESTING
+// ----------------------------------------------------------------
+const expectEqual = std.testing.expectEqual;
+const expect = std.testing.expect;
+
+test "rawtext" {
+    const allocator = std.testing.allocator;
+
+    const content: [:0]const u8 = "Some random html text";
+
+    var token_list = try test_parse_content(content, allocator);
+    defer token_list.deinit();
+
+    try expectEqual(token_list.items.len, 1);
+    try expect(token_list.items[0] == Token.text);
+    try expect(std.mem.eql(u8, token_list.items[0].text, content));
+}
+
+test "basic div" {
+    const allocator = std.testing.allocator;
+
+    const content: [:0]const u8 = "<div>Hello World</div>";
+
+    var token_list = try test_parse_content(content, allocator);
+    defer token_list.deinit();
+
+    try expectEqual(token_list.items.len, 3);
+    try expect(token_list.items[0] == Token.start_tag);
+    try expect(token_list.items[1] == Token.text);
+    try expect(token_list.items[2] == Token.end_tag);
+    try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
+    try expect(std.mem.eql(u8, token_list.items[1].text, "Hello World"));
+    try expect(std.mem.eql(u8, token_list.items[2].end_tag.name, "div"));
+}
+
+test "basic attribute" {
+    const allocator = std.testing.allocator;
+
+    const content: [:0]const u8 = "<div input=\"value\">Hello World</div>";
+
+    var token_list = try test_parse_content(content, allocator);
+    defer token_list.deinit();
+
+    try expectEqual(token_list.items.len, 3);
+    try expect(token_list.items[0] == Token.start_tag);
+    try expect(token_list.items[1] == Token.text);
+    try expect(token_list.items[2] == Token.end_tag);
+    try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
+    try expect(std.mem.eql(u8, token_list.items[1].text, "Hello World"));
+    try expect(std.mem.eql(u8, token_list.items[2].end_tag.name, "div"));
+}
+
+pub fn test_parse_content(content: [:0]const u8, allocator: std.mem.Allocator) !std.ArrayList(Token) {
+    var token_list = std.ArrayList(Token).init(allocator);
+
+    var ngTemplateTokenizer = NgTemplateTokenzier.init(content);
+
+    var t = try ngTemplateTokenizer.next(allocator);
+    while (t != Token.eof) {
+        std.log.info("Parsed Token {any}", .{t});
+        try token_list.append(t);
+        t = try ngTemplateTokenizer.next(allocator);
+    }
+    return token_list;
+}

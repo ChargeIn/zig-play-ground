@@ -28,9 +28,9 @@ pub const DocType = struct {
 pub const StartTag = struct {
     name: []const u8,
     self_closing: bool,
-    attributes: []TagAttribute,
+    attributes: std.ArrayListUnmanaged(Attribute),
 
-    pub fn inti(name: []const u8, self_closing: bool, attributes: []TagAttribute) StartTag {
+    pub fn init(name: []const u8, self_closing: bool, attributes: std.ArrayListUnmanaged(Attribute)) StartTag {
         return StartTag{
             .name = name,
             .self_closing = self_closing,
@@ -46,12 +46,12 @@ pub const StartTag = struct {
     }
 };
 
-pub const TagAttribute = struct {
+pub const Attribute = struct {
     name: []const u8,
     value: []const u8,
 
-    pub fn init(name: []const u8, value: []const u8) TagAttribute {
-        return TagAttribute{
+    pub fn init(name: []const u8, value: []const u8) Attribute {
+        return Attribute{
             .name = name,
             .value = value,
         };
@@ -80,13 +80,12 @@ pub const NgTemplateToken = union(enum) {
     start_tag: StartTag,
     end_tag: EndTag,
     comment: []const u8,
-    character: u8,
+    text: []const u8,
     eof,
 
     pub fn format(value: NgTemplateToken, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         switch (value) {
             .comment => |v| try writer.print("Comment {{ \"{s}\" }}", .{v}),
-            .character => |v| try writer.print("Character {{ \"{any}\" }}", .{v}),
             .eof => try writer.writeAll("End of File"),
             else => try writer.print("{any}", .{value}),
         }

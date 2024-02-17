@@ -1,6 +1,7 @@
 const std = @import("std");
 const fs = std.fs;
 const tokenizer = @import("parser/tokenizer.zig");
+const token = @import("parser/token.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -15,11 +16,15 @@ pub fn main() !void {
     };
     defer allocator.free(content);
 
+    std.log.info("Content: {s}", .{content});
+
     var ngTemplateTokenizer = tokenizer.NgTemplateTokenzier.init(content);
 
-    const token = ngTemplateTokenizer.next();
-
-    std.log.info("file {s}\n token {any}", .{ content, token });
+    var t = try ngTemplateTokenizer.next(allocator);
+    while (t != token.NgTemplateToken.eof) {
+        std.log.info("Token {any}", .{token});
+        t = try ngTemplateTokenizer.next(allocator);
+    }
 }
 
 pub fn readFile(path: []const u8, allocator: std.mem.Allocator) ![:0]u8 {
