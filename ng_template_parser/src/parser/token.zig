@@ -38,6 +38,10 @@ pub const StartTag = struct {
         };
     }
 
+    pub fn deinit(self: *StartTag, allocator: std.mem.Allocator) void {
+        self.attributes.deinit(allocator);
+    }
+
     pub fn format(value: DocType, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print(
             "StartTag {{ name: {s}, attributes: {any}, system_id: {?s}, self_closing: {any} }}",
@@ -88,6 +92,13 @@ pub const NgTemplateToken = union(enum) {
             .comment => |v| try writer.print("Comment {{ \"{s}\" }}", .{v}),
             .eof => try writer.writeAll("End of File"),
             else => try writer.print("{any}", .{value}),
+        }
+    }
+
+    pub fn deinit(self: *NgTemplateToken, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .start_tag => self.deinit(allocator),
+            else => {},
         }
     }
 };

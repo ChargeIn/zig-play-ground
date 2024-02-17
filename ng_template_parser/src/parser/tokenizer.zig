@@ -236,14 +236,19 @@ const Tokenizer = struct {
                     // ignore
                 },
                 0 => {
+                    attribute_list.deinit(allocator);
                     return NgTemplateTokenizerErrors.EofInTag;
                 },
                 '=' => {
+                    attribute_list.deinit(allocator);
                     return NgTemplateTokenizerErrors.UnexpectedEqualsSignBeforeAttributeName;
                 },
                 else => {
                     const attr = try self.parse_attribute();
-                    try attribute_list.append(allocator, attr);
+                    attribute_list.append(allocator, attr) catch |err| {
+                        attribute_list.deinit(allocator);
+                        return err;
+                    };
                 },
             }
         }
@@ -253,7 +258,6 @@ const Tokenizer = struct {
 
     pub fn parse_attribute(self: *Tokenizer) !tokens.Attribute {
         std.log.info("Started parsing attribute: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
-
         return tokens.Attribute.init("name", "value");
     }
 };
@@ -277,7 +281,7 @@ test "rawtext" {
     try expect(std.mem.eql(u8, token_list.items[0].text, content));
 }
 
-test "basic div" {
+test "simple div tag" {
     const allocator = std.testing.allocator;
 
     const content: [:0]const u8 = "<div>Hello World</div>";
@@ -290,25 +294,43 @@ test "basic div" {
     try expect(token_list.items[1] == Token.text);
     try expect(token_list.items[2] == Token.end_tag);
     try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
+    try expectEqual(token_list.items[0].start_tag.self_closing, false);
+    try expectEqual(token_list.items[0].start_tag.attributes.items.len, 0);
     try expect(std.mem.eql(u8, token_list.items[1].text, "Hello World"));
     try expect(std.mem.eql(u8, token_list.items[2].end_tag.name, "div"));
+}
+
+test "self closing tags" {
+    const allocator = std.testing.allocator;
+
+    const content: [:0]const u8 = "<div/>";
+
+    var token_list = try test_parse_content(content, allocator);
+    defer token_list.deinit();
+
+    try expectEqual(token_list.items.len, 1);
+    try expect(token_list.items[0] == Token.start_tag);
+    try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
+    try expectEqual(token_list.items[0].start_tag.self_closing, true);
+    try expectEqual(token_list.items[0].start_tag.attributes.items.len, 0);
 }
 
 test "basic attribute" {
     const allocator = std.testing.allocator;
 
-    const content: [:0]const u8 = "<div input=\"value\">Hello World</div>";
+    const content: [:0]const u8 = "<div input=\"value\">";
 
     var token_list = try test_parse_content(content, allocator);
     defer token_list.deinit();
 
-    try expectEqual(token_list.items.len, 3);
+    try expectEqual(token_list.items.len, 1);
     try expect(token_list.items[0] == Token.start_tag);
-    try expect(token_list.items[1] == Token.text);
-    try expect(token_list.items[2] == Token.end_tag);
     try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
-    try expect(std.mem.eql(u8, token_list.items[1].text, "Hello World"));
-    try expect(std.mem.eql(u8, token_list.items[2].end_tag.name, "div"));
+
+    token_list.items[0].start_tag.attributes.deinit(allocator);
+    for (token_list.items) |*token| {
+        token.deinit(allocator);
+    }
 }
 
 pub fn test_parse_content(content: [:0]const u8, allocator: std.mem.Allocator) !std.ArrayList(Token) {
