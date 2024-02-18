@@ -121,7 +121,7 @@ const Tokenizer = struct {
                 return self.parse_open_tag(allocator);
             },
             '!' => {
-                // TODO
+                return self.parse_markup();
             },
             '/' => {
                 return self.parse_closing_tag();
@@ -136,8 +136,209 @@ const Tokenizer = struct {
                 return NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
             },
         }
+    }
 
-        return Token.eof;
+    pub fn parse_markup(self: *Tokenizer) !Token {
+        std.debug.print("Started parsing markup: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
+
+        // skip '!' character
+        self.index += 1;
+
+        const char = self.buffer[self.index];
+
+        switch (char) {
+            '-' => {
+                return self.parse_comment();
+            },
+            'D', 'd' => {
+                return self.parse_doc_type();
+            },
+            '[' => {
+                return self.parse_cdata();
+            },
+            else => {
+                return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            },
+        }
+    }
+
+    pub fn parse_comment(self: *Tokenizer) !Token {
+        // skip '-' character
+        self.index += 1;
+
+        var char = self.buffer[self.index];
+
+        if (char != '-') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+        self.index += 1;
+
+        const start = self.index;
+
+        while (true) : (self.index += 1) {
+            char = self.buffer[self.index];
+
+            switch (char) {
+                '-' => {
+                    self.index += 1;
+                    char = self.buffer[self.index];
+
+                    if (char != '-') {
+                        continue;
+                    }
+
+                    self.index += 1;
+                    char = self.buffer[self.index];
+
+                    if (char != '>') {
+                        continue;
+                    }
+                    self.index += 1;
+
+                    return Token{ .comment = self.buffer[start..(self.index - 3)] };
+                },
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInComment;
+                },
+                else => {},
+            }
+        }
+    }
+
+    pub fn parse_doc_type(self: *Tokenizer) !Token {
+        // Note: Since this token is not really used in the context of angular templates we will not validate it but
+        // keep the content as string
+        self.index += 1;
+        var char = self.buffer[self.index];
+
+        if (char != 'O' and char != 'o') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'C' and char != 'c') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'T' and char != 't') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'Y' and char != 'y') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'P' and char != 'p') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'E' and char != 'e') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+        self.index += 1;
+
+        const start = self.index;
+        while (char != '>' and char != 0) : (self.index += 1) {
+            char = self.buffer[self.index];
+        }
+
+        if (char == 0) {
+            return NgTemplateTokenizerErrors.EofInDoctype;
+        }
+
+        return Token{ .doc_type = self.buffer[start..(self.index - 1)] };
+    }
+
+    pub fn parse_cdata(self: *Tokenizer) !Token {
+        // Note: Since this token is not really used in the context of angular templates we will not validate it but
+        // keep the content as string
+        self.index += 1;
+        var char = self.buffer[self.index];
+
+        if (char != 'C') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'D') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'A') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'T') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != 'A') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+        char = self.buffer[self.index];
+
+        if (char != '[') {
+            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+        }
+
+        self.index += 1;
+
+        const start = self.index;
+        while (true) : (self.index += 1) {
+            char = self.buffer[self.index];
+
+            switch (char) {
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInCdata;
+                },
+                ']' => {
+                    self.index += 1;
+                    char = self.buffer[self.index];
+
+                    if (char != ']') {
+                        continue;
+                    }
+
+                    self.index += 1;
+                    char = self.buffer[self.index];
+
+                    if (char != '>') {
+                        continue;
+                    }
+                    self.index += 1;
+
+                    return Token{ .cdata = self.buffer[start..(self.index - 4)] };
+                },
+                else => {},
+            }
+        }
     }
 
     pub fn parse_open_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
@@ -223,10 +424,8 @@ const Tokenizer = struct {
 
         var attribute_list = std.ArrayListUnmanaged(tokens.Attribute){};
 
-        var char: u8 = 0;
-
-        while (true) : (self.index += 1) {
-            char = self.buffer[self.index];
+        while (true) {
+            const char = self.buffer[self.index];
 
             switch (char) {
                 '>', '/' => {
@@ -234,6 +433,7 @@ const Tokenizer = struct {
                 },
                 TAB, LINE_FEED, FORM_FEED, SPACE => {
                     // ignore
+                    self.index += 1;
                 },
                 0 => {
                     attribute_list.deinit(allocator);
@@ -260,29 +460,40 @@ const Tokenizer = struct {
         std.debug.print("Started parsing attribute: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
         const start = self.index;
 
-        var char = self.buffer[self.index];
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
 
-        while (true) {
             // we can assume that at name is not empty and the first char belongs to it
             switch (char) {
-                0 => return NgTemplateTokenizerErrors.EofInTag,
-                '\'', '<', '"' => return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName,
-                '/', '>' => return tokens.Attribute.init(self.buffer[start..self.index], ""),
-                TAB, LINE_FEED, FORM_FEED, SPACE, '=' => break,
-                else => {
-                    self.index += 1;
-                    char = self.buffer[self.index];
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
                 },
+                '\'', '<', '"' => {
+                    return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName;
+                },
+                '/', '>' => {
+                    return tokens.Attribute.init(self.buffer[start..self.index], "");
+                },
+                TAB, LINE_FEED, FORM_FEED, SPACE, '=' => {
+                    break;
+                },
+                else => {},
             }
         }
 
         const name_end = self.index;
 
-        while (true) {
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
             switch (char) {
                 0 => return NgTemplateTokenizerErrors.EofInTag,
-                '\'', '<', '"' => return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName,
-                '/', '>' => return tokens.Attribute.init(self.buffer[start..self.index], ""),
+                '\'', '<', '"' => {
+                    return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName;
+                },
+                '/', '>' => {
+                    return tokens.Attribute.init(self.buffer[start..self.index], "");
+                },
                 '=' => {
                     const name = self.buffer[start..name_end];
 
@@ -291,11 +502,10 @@ const Tokenizer = struct {
 
                     return tokens.Attribute.init(name, value);
                 },
-                TAB, LINE_FEED, FORM_FEED, SPACE => {
-                    self.index += 1;
-                    char = self.buffer[self.index];
+                TAB, LINE_FEED, FORM_FEED, SPACE => {},
+                else => {
+                    return tokens.Attribute.init(self.buffer[start..name_end], "");
                 },
-                else => return tokens.Attribute.init(self.buffer[start..name_end], ""),
             }
         }
     }
@@ -316,10 +526,18 @@ const Tokenizer = struct {
         const char = self.buffer[self.index];
 
         switch (char) {
-            '\'' => return self.parse_single_quoted_value(),
-            '"' => return self.parse_double_quoted_value(),
-            '>' => return NgTemplateTokenizerErrors.MissingAttributeValue,
-            else => return self.parse_unquoted_value(),
+            '\'' => {
+                return self.parse_single_quoted_value();
+            },
+            '"' => {
+                return self.parse_double_quoted_value();
+            },
+            '>' => {
+                return NgTemplateTokenizerErrors.MissingAttributeValue;
+            },
+            else => {
+                return self.parse_unquoted_value();
+            },
         }
     }
 
@@ -335,8 +553,14 @@ const Tokenizer = struct {
             const char = self.buffer[self.index];
 
             switch (char) {
-                0 => return NgTemplateTokenizerErrors.EofInTag,
-                '\'' => return self.buffer[start..self.index],
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
+                },
+                '\'' => {
+                    const end = self.index;
+                    self.index += 1;
+                    return self.buffer[start..end];
+                },
                 else => {},
             }
         }
@@ -354,8 +578,14 @@ const Tokenizer = struct {
             const char = self.buffer[self.index];
 
             switch (char) {
-                0 => return NgTemplateTokenizerErrors.EofInTag,
-                '"' => return self.buffer[start..self.index],
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
+                },
+                '"' => {
+                    const end = self.index;
+                    self.index += 1;
+                    return self.buffer[start..end];
+                },
                 else => {},
             }
         }
@@ -369,9 +599,15 @@ const Tokenizer = struct {
             const char = self.buffer[self.index];
 
             switch (char) {
-                0 => return NgTemplateTokenizerErrors.EofInTag,
-                TAB, LINE_FEED, FORM_FEED, SPACE, '>' => return self.buffer[start..self.index],
-                '"', '\'', '`', '<', '=' => return NgTemplateTokenizerErrors.UnexpectedCharacterInUnquotedAttributeValue,
+                0 => {
+                    return NgTemplateTokenizerErrors.EofInTag;
+                },
+                TAB, LINE_FEED, FORM_FEED, SPACE, '>' => {
+                    return self.buffer[start..self.index];
+                },
+                '"', '\'', '`', '<', '=' => {
+                    return NgTemplateTokenizerErrors.UnexpectedCharacterInUnquotedAttributeValue;
+                },
                 else => {},
             }
         }

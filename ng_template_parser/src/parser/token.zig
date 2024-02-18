@@ -1,30 +1,5 @@
 const std = @import("std");
 
-// Note we assume that the content of the file is valid utf+8
-// Based on the offical standard https://html.spec.whatwg.org/multipage/parsing.html
-pub const DocType = struct {
-    name: ?[]const u8,
-    public_id: ?[]const u8,
-    system_id: ?[]const u8,
-    force_quirks: bool,
-
-    pub fn init(force_quirks: bool, name: ?[]const u8, public_id: ?[]const u8, system_id: ?[]const u8) DocType {
-        return DocType{
-            .name = name,
-            .public_id = public_id,
-            .system_id = system_id,
-            .force_quirks = force_quirks,
-        };
-    }
-
-    pub fn format(value: DocType, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print(
-            "DocType {{ name: {?s}, public_id: {?s}, system_id: {?s}, force_quirks: {any} }}",
-            .{ value.name, value.public_id, value.system_id, value.force_quirks },
-        );
-    }
-};
-
 pub const StartTag = struct {
     name: []const u8,
     self_closing: bool,
@@ -101,9 +76,10 @@ pub const EndTag = struct {
 };
 
 pub const NgTemplateToken = union(enum) {
-    doc_type: DocType,
     start_tag: StartTag,
     end_tag: EndTag,
+    doc_type: []const u8,
+    cdata: []const u8,
     comment: []const u8,
     text: []const u8,
     eof,
@@ -112,10 +88,11 @@ pub const NgTemplateToken = union(enum) {
         switch (value) {
             .comment => |v| try writer.print("Comment {{ \"{s}\" }}", .{v}),
             .text => |v| try writer.print("Text {{ \"{s}\" }}", .{v}),
+            .cdata => |v| try writer.print("RcData {{ \"{s}\" }}", .{v}),
+            .doc_type => |v| try writer.print("DocType {{ \"{s}\" }}", .{v}),
             .eof => try writer.print("End of File", .{}),
             .start_tag => |v| try v.format(fmt, opt, writer),
             .end_tag => |v| try v.format(fmt, opt, writer),
-            else => try writer.print("Unknown Token", .{}),
         }
     }
 

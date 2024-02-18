@@ -32,7 +32,12 @@ pub fn test_tokenizer(content: [:0]const u8, expected_tokens: []const Token) !vo
     var token_list = try test_parse_content(content, allocator);
     defer token_list.deinit();
 
-    try expectEqual(expected_tokens.len, token_list.items.len);
+    expectEqual(expected_tokens.len, token_list.items.len) catch |err| {
+        defer for (token_list.items) |*item| {
+            item.deinit(allocator);
+        };
+        return err;
+    };
 
     defer for (token_list.items) |*item| {
         item.deinit(allocator);
@@ -96,10 +101,21 @@ pub fn test_equal_tokens(t1: Token, t2: Token) !void {
     }
 }
 
+pub fn readFile(path: []const u8, allocator: std.mem.Allocator) ![:0]u8 {
+    var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
+    defer file.close();
+
+    const stat = try file.stat();
+    const file_size = stat.size;
+
+    const content = try file.readToEndAllocOptions(allocator, file_size, null, 1, 0);
+
+    return content;
+}
+
 // ----------------------------------------------------------------
 //                      TESTING
 // ----------------------------------------------------------------
-
 test "rawtext" {
     const content: [:0]const u8 = "Some random html text.";
     const expected = [_]Token{Token{ .text = "Some random html text." }};
@@ -125,14 +141,15 @@ test "self closing tags" {
     try test_tokenizer(content, &expected);
 }
 
-test "basic attribute" {
+test "tag attributes" {
     const content: [:0]const u8 =
         \\<div
-        \\  input1="value1"
-        \\  input2='value2'
-        \\  input3=value3
-        \\  input4  =   value4
-        \\>
+        \\   input1="value1"
+        \\   input2='value2'
+        \\   input3=value3
+        \\   input4  =   value4
+        \\   input5
+        \\   input6>
     ;
     const allocator = std.testing.allocator;
     var attributes = std.ArrayListUnmanaged(Attribute){};
@@ -142,6 +159,8 @@ test "basic attribute" {
     try attributes.append(allocator, Attribute.init("input2", "value2"));
     try attributes.append(allocator, Attribute.init("input3", "value3"));
     try attributes.append(allocator, Attribute.init("input4", "value4"));
+    try attributes.append(allocator, Attribute.init("input5", ""));
+    try attributes.append(allocator, Attribute.init("input6", ""));
 
     const expected = [_]Token{
         Token{ .start_tag = StartTag.init("div", false, attributes) },
@@ -149,3 +168,49 @@ test "basic attribute" {
 
     try test_tokenizer(content, &expected);
 }
+
+test "comment" {
+    const content: [:0]const u8 = "<!--Hello &amp; <-> World! -->";
+    const expected = [_]Token{Token{ .comment = "Hello &amp; <-> World! " }};
+
+    try test_tokenizer(content, &expected);
+}
+
+test "doctype" {
+    const content: [:0]const u8 =
+        \\<!DOCTYPE html><!DocType html><!Doctype html><!doctype html><!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML      4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+    ;
+    const expected = [_]Token{
+        Token{ .doc_type = " html" },
+        Token{ .doc_type = " html" },
+        Token{ .doc_type = " html" },
+        Token{ .doc_type = " html" },
+        Token{ .doc_type = "  HTML PUBLIC \"-//W3C//DTD HTML      4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\"" },
+    };
+
+    try test_tokenizer(content, &expected);
+}
+
+test "cdata" {
+    const content: [:0]const u8 = "<![CDATA[<div>-!#&8--!<!-->ds]] .!<\"§$%&/(]]>";
+    const expected = [_]Token{Token{ .cdata = "<div>-!#&8--!<!-->ds]] .!<\"§$%&/(" }};
+
+    try test_tokenizer(content, &expected);
+}
+
+// test "parse all elements" {
+//     const allocator = std.testing.allocator;
+//
+//     const content: [:0]u8 = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
+//         std.log.err("Could not read file: {any}", .{err});
+//         return;
+//     };
+//     defer allocator.free(content);
+//
+//     var token_list = try test_parse_content(content, allocator);
+//     defer for (token_list.items) |*item| {
+//         item.deinit(allocator);
+//     };
+//
+//     defer token_list.deinit();
+// }
