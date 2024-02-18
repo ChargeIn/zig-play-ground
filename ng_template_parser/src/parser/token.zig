@@ -42,11 +42,25 @@ pub const StartTag = struct {
         self.attributes.deinit(allocator);
     }
 
-    pub fn format(value: DocType, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(value: StartTag, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print(
-            "StartTag {{ name: {s}, attributes: {any}, system_id: {?s}, self_closing: {any} }}",
-            .{ value.name, value.attributes, value.self_closing },
+            "StartTag {{ name: {s}, self_closing: {any}, attributes: [",
+            .{ value.name, value.self_closing },
         );
+
+        if (value.attributes.items.len > 0) {
+            try writer.print(" ", .{});
+
+            for (value.attributes.items, 0..) |attr, i| {
+                try attr.format(fmt, opt, writer);
+                if (i < value.attributes.items.len - 1) {
+                    try writer.print(", ", .{});
+                }
+            }
+            try writer.print(" ", .{});
+        }
+
+        try writer.print("] }}", .{});
     }
 };
 
@@ -60,6 +74,13 @@ pub const Attribute = struct {
             .value = value,
         };
     }
+
+    pub fn format(value: Attribute, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "Attribute {{ name: \"{s}\", value: \"{s}\" }}",
+            .{ value.name, value.value },
+        );
+    }
 };
 
 pub const EndTag = struct {
@@ -71,7 +92,7 @@ pub const EndTag = struct {
         };
     }
 
-    pub fn format(value: DocType, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(value: EndTag, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print(
             "EndTag {{ name: {s} }}",
             .{value.name},
@@ -87,17 +108,20 @@ pub const NgTemplateToken = union(enum) {
     text: []const u8,
     eof,
 
-    pub fn format(value: NgTemplateToken, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(value: NgTemplateToken, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {
         switch (value) {
             .comment => |v| try writer.print("Comment {{ \"{s}\" }}", .{v}),
-            .eof => try writer.writeAll("End of File"),
-            else => try writer.print("{any}", .{value}),
+            .text => |v| try writer.print("Text {{ \"{s}\" }}", .{v}),
+            .eof => try writer.print("End of File", .{}),
+            .start_tag => |v| try v.format(fmt, opt, writer),
+            .end_tag => |v| try v.format(fmt, opt, writer),
+            else => try writer.print("Unknown Token", .{}),
         }
     }
 
     pub fn deinit(self: *NgTemplateToken, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .start_tag => self.deinit(allocator),
+            .start_tag => |*v| v.deinit(allocator),
             else => {},
         }
     }

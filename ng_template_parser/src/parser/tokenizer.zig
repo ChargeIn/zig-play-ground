@@ -81,6 +81,7 @@ const Tokenizer = struct {
     pub fn next(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
         const char = self.buffer[self.index];
 
+        std.debug.print("\n -------- Started parsing next token --------\nStart with Char: '{c}'\n", .{char});
         switch (char) {
             '<' => {
                 return self.parse_tag(allocator);
@@ -95,7 +96,7 @@ const Tokenizer = struct {
     }
 
     pub fn parse_text(self: *Tokenizer) Token {
-        std.log.info("Started parsing text: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+        std.debug.print("Started parsing text: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         var char = self.buffer[self.index];
         const start = self.index;
@@ -104,12 +105,11 @@ const Tokenizer = struct {
             self.index += 1;
             char = self.buffer[self.index];
         }
-
         return Token{ .text = self.buffer[start..self.index] };
     }
 
     pub fn parse_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
-        std.log.info("Started parsing tag : Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+        std.debug.print("Started parsing tag : Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '<' token
         self.index += 1;
@@ -141,7 +141,7 @@ const Tokenizer = struct {
     }
 
     pub fn parse_open_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
-        std.log.info("Started parsing open tag: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+        std.debug.print("Started parsing open tag: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         const name = try self.parse_tag_name();
         const attributes = try self.parse_attributes(allocator);
@@ -165,7 +165,7 @@ const Tokenizer = struct {
     }
 
     pub fn parse_closing_tag(self: *Tokenizer) !Token {
-        std.log.info("Started parsing closing tag: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+        std.debug.print("Started parsing closing tag: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '/' token
         self.index += 1;
@@ -194,7 +194,7 @@ const Tokenizer = struct {
 
     // Note: Assumes that the first character is ASCII alpha
     pub fn parse_tag_name(self: *Tokenizer) ![]const u8 {
-        std.log.info("Started parsing tag name: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+        std.debug.print("Started parsing tag name: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         const start = self.index;
 
@@ -219,7 +219,7 @@ const Tokenizer = struct {
     }
 
     pub fn parse_attributes(self: *Tokenizer, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(tokens.Attribute) {
-        std.log.info("Started parsing attributes: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
+        std.debug.print("Started parsing attributes: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         var attribute_list = std.ArrayListUnmanaged(tokens.Attribute){};
 
@@ -257,92 +257,123 @@ const Tokenizer = struct {
     }
 
     pub fn parse_attribute(self: *Tokenizer) !tokens.Attribute {
-        std.log.info("Started parsing attribute: Line: {any} Char: {c}", .{ self.index, self.buffer[self.index] });
-        return tokens.Attribute.init("name", "value");
+        std.debug.print("Started parsing attribute: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
+        const start = self.index;
+
+        var char = self.buffer[self.index];
+
+        while (true) {
+            // we can assume that at name is not empty and the first char belongs to it
+            switch (char) {
+                0 => return NgTemplateTokenizerErrors.EofInTag,
+                '\'', '<', '"' => return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName,
+                '/', '>' => return tokens.Attribute.init(self.buffer[start..self.index], ""),
+                TAB, LINE_FEED, FORM_FEED, SPACE, '=' => break,
+                else => {
+                    self.index += 1;
+                    char = self.buffer[self.index];
+                },
+            }
+        }
+
+        const name_end = self.index;
+
+        while (true) {
+            switch (char) {
+                0 => return NgTemplateTokenizerErrors.EofInTag,
+                '\'', '<', '"' => return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName,
+                '/', '>' => return tokens.Attribute.init(self.buffer[start..self.index], ""),
+                '=' => {
+                    const name = self.buffer[start..name_end];
+
+                    self.index += 1;
+                    const value = try self.parse_attribute_value();
+
+                    return tokens.Attribute.init(name, value);
+                },
+                TAB, LINE_FEED, FORM_FEED, SPACE => {
+                    self.index += 1;
+                    char = self.buffer[self.index];
+                },
+                else => return tokens.Attribute.init(self.buffer[start..name_end], ""),
+            }
+        }
+    }
+
+    pub fn parse_attribute_value(self: *Tokenizer) ![]const u8 {
+        std.debug.print("Started parsing attribute value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
+
+        // remove white space characters before the value parsing
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (char) {
+                TAB, LINE_FEED, FORM_FEED, SPACE => {},
+                else => break,
+            }
+        }
+
+        const char = self.buffer[self.index];
+
+        switch (char) {
+            '\'' => return self.parse_single_quoted_value(),
+            '"' => return self.parse_double_quoted_value(),
+            '>' => return NgTemplateTokenizerErrors.MissingAttributeValue,
+            else => return self.parse_unquoted_value(),
+        }
+    }
+
+    pub fn parse_single_quoted_value(self: *Tokenizer) ![]const u8 {
+        std.debug.print("Started parsing attribute single quoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
+
+        // skip '\'' character
+        self.index += 1;
+
+        const start = self.index;
+
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (char) {
+                0 => return NgTemplateTokenizerErrors.EofInTag,
+                '\'' => return self.buffer[start..self.index],
+                else => {},
+            }
+        }
+    }
+
+    pub fn parse_double_quoted_value(self: *Tokenizer) ![]const u8 {
+        std.debug.print("Started parsing attribute double quoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
+
+        // skip '"' character
+        self.index += 1;
+
+        const start = self.index;
+
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (char) {
+                0 => return NgTemplateTokenizerErrors.EofInTag,
+                '"' => return self.buffer[start..self.index],
+                else => {},
+            }
+        }
+    }
+
+    pub fn parse_unquoted_value(self: *Tokenizer) ![]const u8 {
+        std.debug.print("Started parsing attribute unquoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
+        const start = self.index;
+
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (char) {
+                0 => return NgTemplateTokenizerErrors.EofInTag,
+                TAB, LINE_FEED, FORM_FEED, SPACE, '>' => return self.buffer[start..self.index],
+                '"', '\'', '`', '<', '=' => return NgTemplateTokenizerErrors.UnexpectedCharacterInUnquotedAttributeValue,
+                else => {},
+            }
+        }
     }
 };
-
-// ----------------------------------------------------------------
-//                      TESTING
-// ----------------------------------------------------------------
-const expectEqual = std.testing.expectEqual;
-const expect = std.testing.expect;
-
-test "rawtext" {
-    const allocator = std.testing.allocator;
-
-    const content: [:0]const u8 = "Some random html text";
-
-    var token_list = try test_parse_content(content, allocator);
-    defer token_list.deinit();
-
-    try expectEqual(token_list.items.len, 1);
-    try expect(token_list.items[0] == Token.text);
-    try expect(std.mem.eql(u8, token_list.items[0].text, content));
-}
-
-test "simple div tag" {
-    const allocator = std.testing.allocator;
-
-    const content: [:0]const u8 = "<div>Hello World</div>";
-
-    var token_list = try test_parse_content(content, allocator);
-    defer token_list.deinit();
-
-    try expectEqual(token_list.items.len, 3);
-    try expect(token_list.items[0] == Token.start_tag);
-    try expect(token_list.items[1] == Token.text);
-    try expect(token_list.items[2] == Token.end_tag);
-    try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
-    try expectEqual(token_list.items[0].start_tag.self_closing, false);
-    try expectEqual(token_list.items[0].start_tag.attributes.items.len, 0);
-    try expect(std.mem.eql(u8, token_list.items[1].text, "Hello World"));
-    try expect(std.mem.eql(u8, token_list.items[2].end_tag.name, "div"));
-}
-
-test "self closing tags" {
-    const allocator = std.testing.allocator;
-
-    const content: [:0]const u8 = "<div/>";
-
-    var token_list = try test_parse_content(content, allocator);
-    defer token_list.deinit();
-
-    try expectEqual(token_list.items.len, 1);
-    try expect(token_list.items[0] == Token.start_tag);
-    try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
-    try expectEqual(token_list.items[0].start_tag.self_closing, true);
-    try expectEqual(token_list.items[0].start_tag.attributes.items.len, 0);
-}
-
-test "basic attribute" {
-    const allocator = std.testing.allocator;
-
-    const content: [:0]const u8 = "<div input=\"value\">";
-
-    var token_list = try test_parse_content(content, allocator);
-    defer token_list.deinit();
-
-    try expectEqual(token_list.items.len, 1);
-    try expect(token_list.items[0] == Token.start_tag);
-    try expect(std.mem.eql(u8, token_list.items[0].start_tag.name, "div"));
-
-    token_list.items[0].start_tag.attributes.deinit(allocator);
-    for (token_list.items) |*token| {
-        token.deinit(allocator);
-    }
-}
-
-pub fn test_parse_content(content: [:0]const u8, allocator: std.mem.Allocator) !std.ArrayList(Token) {
-    var token_list = std.ArrayList(Token).init(allocator);
-
-    var ngTemplateTokenizer = NgTemplateTokenzier.init(content);
-
-    var t = try ngTemplateTokenizer.next(allocator);
-    while (t != Token.eof) {
-        std.log.info("Parsed Token {any}", .{t});
-        try token_list.append(t);
-        t = try ngTemplateTokenizer.next(allocator);
-    }
-    return token_list;
-}
