@@ -4,7 +4,7 @@ const Token = tokens.NgTemplateToken;
 const StartTag = tokens.StartTag;
 const EndTag = tokens.EndTag;
 const Attribute = tokens.Attribute;
-const NgTemplateTokenzier = @import("tokenizer.zig").NgTemplateTokenzier;
+const NgTemplateLexer = @import("lexer.zig").NgTemplateLexer;
 const expectEqual = std.testing.expectEqual;
 const expect = std.testing.expect;
 
@@ -14,13 +14,13 @@ const expect = std.testing.expect;
 pub fn test_parse_content(content: [:0]const u8, allocator: std.mem.Allocator) !std.ArrayList(Token) {
     var token_list = std.ArrayList(Token).init(allocator);
 
-    var ngTemplateTokenizer = NgTemplateTokenzier.init(content);
+    var ngTemplateLexer = NgTemplateLexer.init(content);
 
-    var t = try ngTemplateTokenizer.next(allocator);
+    var t = try ngTemplateLexer.next(allocator);
     std.debug.print("Parsed Token {any}\n", .{t});
     while (t != Token.eof) {
         try token_list.append(t);
-        t = try ngTemplateTokenizer.next(allocator);
+        t = try ngTemplateLexer.next(allocator);
         std.debug.print("Parsed Token {any}\n", .{t});
     }
     return token_list;
@@ -198,19 +198,20 @@ test "cdata" {
     try test_tokenizer(content, &expected);
 }
 
-// test "parse all elements" {
-//     const allocator = std.testing.allocator;
-//
-//     const content: [:0]u8 = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
-//         std.log.err("Could not read file: {any}", .{err});
-//         return;
-//     };
-//     defer allocator.free(content);
-//
-//     var token_list = try test_parse_content(content, allocator);
-//     defer for (token_list.items) |*item| {
-//         item.deinit(allocator);
-//     };
-//
-//     defer token_list.deinit();
-// }
+test "parse all elements" {
+    const allocator = std.testing.allocator;
+
+    const content: [:0]u8 = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
+        std.log.err("Could not read file: {any}", .{err});
+        return;
+    };
+    defer allocator.free(content);
+
+    var token_list = try test_parse_content(content, allocator);
+
+    for (token_list.items) |*item| {
+        item.deinit(allocator);
+    }
+
+    defer token_list.deinit();
+}

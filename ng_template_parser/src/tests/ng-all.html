@@ -1,0 +1,57 @@
+<!--
+  ~ Copyright (c) Florian Plesker
+  ~ florian.plesker@web.de
+  -->
+<div
+    staticInput="Hello"
+    staticInput2="{{ 'Hello' + 'World' }}"
+    [simpleBinding]="'World'"
+    [(user)]="userVariable"
+    (userChanged)="onUserChange($event)"
+></div>
+
+<div *ngIf="value.show; else alternative">Hello World</div>
+
+<ng-template #alternative>
+    <div>Hello World 2</div>
+</ng-template>
+
+@if(value.show) {
+    <div>Hello World</div>
+} @else if(value.show2) {
+    <div>Hello World 2</div>
+} @else {
+    <div>Hello World 3</div>
+}
+
+@defer (on timer(2); prefetch on idle) {
+    <div>Hello World deferred!</div>
+} @placeholder {
+    <div>Placeholder :/</div>
+} @loading {
+    <div>Loading...</div>
+} @error {
+    <div>Error!</div>
+}
+
+<div [ngSwitch]="accessLevel">
+    <admin-dashboard *ngSwitchCase="admin"/>
+    <moderator-dashboard *ngSwitchCase="moderator"/>
+    <user-dashboard *ngSwitchDefault/>
+</div>
+
+@switch (accessLevel) {
+    @case ('admin') { <admin-dashboard/> }
+    @case ('moderator') { <moderator-dashboard/> }
+    @default { <user-dashboard/> }
+}
+
+<div *ngFor="let user of users; trackBy user.id">
+    <div>{{ user.name }}</div>
+</div>
+
+@for (user of users; track user.id) {
+    {{ user.name }}
+} @empty {
+    Empty list of users
+}

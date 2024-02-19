@@ -4,14 +4,14 @@ const Token = tokens.NgTemplateToken;
 
 // For a good referenz see https://github.com/ziglang/zig/blob/master/lib/std/zig/tokenizer.zig
 
-pub const NgTemplateTokenzier = Tokenizer;
+pub const NgTemplateLexer = Lexer;
 
 const TAB = 0x09;
 const LINE_FEED = 0x0A;
 const FORM_FEED = 0x0C;
 const SPACE = 0x20;
 
-const NgTemplateTokenizerErrors = error{
+const NgTemplateLexerErrors = error{
     AbruptClosingOfEmptyComment,
     AbruptDoctypePublicIdentifier,
     AbruptDoctypeSystemIdentifier,
@@ -64,21 +64,21 @@ const NgTemplateTokenizerErrors = error{
     UnsupportedTokenException,
 };
 
-const Tokenizer = struct {
+const Lexer = struct {
     buffer: [:0]const u8,
     index: usize,
 
-    pub fn init(buffer: [:0]const u8) Tokenizer {
+    pub fn init(buffer: [:0]const u8) Lexer {
         // Skip the UTF-8 BOM if present
         const src_start: usize = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0;
-        return Tokenizer{
+        return Lexer{
             .buffer = buffer,
             .index = src_start,
         };
     }
 
     // Note: To optimize we assume the html is correct, otherwise the tokenizer will emit eof and set the error state
-    pub fn next(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
+    pub fn next(self: *Lexer, allocator: std.mem.Allocator) !Token {
         const char = self.buffer[self.index];
 
         std.debug.print("\n -------- Started parsing next token --------\nStart with Char: '{c}'\n", .{char});
@@ -95,7 +95,7 @@ const Tokenizer = struct {
         }
     }
 
-    pub fn parse_text(self: *Tokenizer) Token {
+    pub fn parse_text(self: *Lexer) Token {
         std.debug.print("Started parsing text: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         var char = self.buffer[self.index];
@@ -108,7 +108,7 @@ const Tokenizer = struct {
         return Token{ .text = self.buffer[start..self.index] };
     }
 
-    pub fn parse_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
+    pub fn parse_tag(self: *Lexer, allocator: std.mem.Allocator) !Token {
         std.debug.print("Started parsing tag : Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '<' token
@@ -127,18 +127,18 @@ const Tokenizer = struct {
                 return self.parse_closing_tag();
             },
             '?' => {
-                return NgTemplateTokenizerErrors.UnexpectedQuestionMarkInsteadOfTagName;
+                return NgTemplateLexerErrors.UnexpectedQuestionMarkInsteadOfTagName;
             },
             0 => {
-                return NgTemplateTokenizerErrors.EofBeforeTagName;
+                return NgTemplateLexerErrors.EofBeforeTagName;
             },
             else => {
-                return NgTemplateTokenizerErrors.InvalidFirstCharacterOfTagName;
+                return NgTemplateLexerErrors.InvalidFirstCharacterOfTagName;
             },
         }
     }
 
-    pub fn parse_markup(self: *Tokenizer) !Token {
+    pub fn parse_markup(self: *Lexer) !Token {
         std.debug.print("Started parsing markup: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '!' character
@@ -157,19 +157,19 @@ const Tokenizer = struct {
                 return self.parse_cdata();
             },
             else => {
-                return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+                return NgTemplateLexerErrors.IncorrectlyOpenedComment;
             },
         }
     }
 
-    pub fn parse_comment(self: *Tokenizer) !Token {
+    pub fn parse_comment(self: *Lexer) !Token {
         // skip '-' character
         self.index += 1;
 
         var char = self.buffer[self.index];
 
         if (char != '-') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
         self.index += 1;
 
@@ -198,56 +198,56 @@ const Tokenizer = struct {
                     return Token{ .comment = self.buffer[start..(self.index - 3)] };
                 },
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInComment;
+                    return NgTemplateLexerErrors.EofInComment;
                 },
                 else => {},
             }
         }
     }
 
-    pub fn parse_doc_type(self: *Tokenizer) !Token {
+    pub fn parse_doc_type(self: *Lexer) !Token {
         // Note: Since this token is not really used in the context of angular templates we will not validate it but
         // keep the content as string
         self.index += 1;
         var char = self.buffer[self.index];
 
         if (char != 'O' and char != 'o') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'C' and char != 'c') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'T' and char != 't') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'Y' and char != 'y') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'P' and char != 'p') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'E' and char != 'e') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
         self.index += 1;
 
@@ -257,55 +257,55 @@ const Tokenizer = struct {
         }
 
         if (char == 0) {
-            return NgTemplateTokenizerErrors.EofInDoctype;
+            return NgTemplateLexerErrors.EofInDoctype;
         }
 
         return Token{ .doc_type = self.buffer[start..(self.index - 1)] };
     }
 
-    pub fn parse_cdata(self: *Tokenizer) !Token {
+    pub fn parse_cdata(self: *Lexer) !Token {
         // Note: Since this token is not really used in the context of angular templates we will not validate it but
         // keep the content as string
         self.index += 1;
         var char = self.buffer[self.index];
 
         if (char != 'C') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'D') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'A') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'T') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != 'A') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
         char = self.buffer[self.index];
 
         if (char != '[') {
-            return NgTemplateTokenizerErrors.IncorrectlyOpenedComment;
+            return NgTemplateLexerErrors.IncorrectlyOpenedComment;
         }
 
         self.index += 1;
@@ -316,7 +316,7 @@ const Tokenizer = struct {
 
             switch (char) {
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInCdata;
+                    return NgTemplateLexerErrors.EofInCdata;
                 },
                 ']' => {
                     self.index += 1;
@@ -341,7 +341,7 @@ const Tokenizer = struct {
         }
     }
 
-    pub fn parse_open_tag(self: *Tokenizer, allocator: std.mem.Allocator) !Token {
+    pub fn parse_open_tag(self: *Lexer, allocator: std.mem.Allocator) !Token {
         std.debug.print("Started parsing open tag: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         const name = try self.parse_tag_name();
@@ -355,9 +355,9 @@ const Tokenizer = struct {
 
         if (self.buffer[self.index] != '>') {
             if (self.buffer[self.index] == 0) {
-                return NgTemplateTokenizerErrors.EofInTag;
+                return NgTemplateLexerErrors.EofInTag;
             } else {
-                return NgTemplateTokenizerErrors.UnexpectedSolidusInTag;
+                return NgTemplateLexerErrors.UnexpectedSolidusInTag;
             }
         }
         self.index += 1;
@@ -365,7 +365,7 @@ const Tokenizer = struct {
         return Token{ .start_tag = tokens.StartTag.init(name, self_closing, attributes) };
     }
 
-    pub fn parse_closing_tag(self: *Tokenizer) !Token {
+    pub fn parse_closing_tag(self: *Lexer) !Token {
         std.debug.print("Started parsing closing tag: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '/' token
@@ -384,17 +384,17 @@ const Tokenizer = struct {
                     return Token{ .end_tag = tokens.EndTag.init(name) };
                 },
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 else => {
-                    return NgTemplateTokenizerErrors.UnsupportedTokenException;
+                    return NgTemplateLexerErrors.UnsupportedTokenException;
                 },
             }
         }
     }
 
     // Note: Assumes that the first character is ASCII alpha
-    pub fn parse_tag_name(self: *Tokenizer) ![]const u8 {
+    pub fn parse_tag_name(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing tag name: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         const start = self.index;
@@ -410,7 +410,7 @@ const Tokenizer = struct {
                     break;
                 },
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 else => {},
             }
@@ -419,7 +419,7 @@ const Tokenizer = struct {
         return self.buffer[start..self.index];
     }
 
-    pub fn parse_attributes(self: *Tokenizer, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(tokens.Attribute) {
+    pub fn parse_attributes(self: *Lexer, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(tokens.Attribute) {
         std.debug.print("Started parsing attributes: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         var attribute_list = std.ArrayListUnmanaged(tokens.Attribute){};
@@ -437,11 +437,11 @@ const Tokenizer = struct {
                 },
                 0 => {
                     attribute_list.deinit(allocator);
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 '=' => {
                     attribute_list.deinit(allocator);
-                    return NgTemplateTokenizerErrors.UnexpectedEqualsSignBeforeAttributeName;
+                    return NgTemplateLexerErrors.UnexpectedEqualsSignBeforeAttributeName;
                 },
                 else => {
                     const attr = try self.parse_attribute();
@@ -456,7 +456,7 @@ const Tokenizer = struct {
         return attribute_list;
     }
 
-    pub fn parse_attribute(self: *Tokenizer) !tokens.Attribute {
+    pub fn parse_attribute(self: *Lexer) !tokens.Attribute {
         std.debug.print("Started parsing attribute: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
         const start = self.index;
 
@@ -466,10 +466,10 @@ const Tokenizer = struct {
             // we can assume that at name is not empty and the first char belongs to it
             switch (char) {
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 '\'', '<', '"' => {
-                    return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName;
+                    return NgTemplateLexerErrors.UnexpectedCharacterInAttributeName;
                 },
                 '/', '>' => {
                     return tokens.Attribute.init(self.buffer[start..self.index], "");
@@ -487,9 +487,9 @@ const Tokenizer = struct {
             const char = self.buffer[self.index];
 
             switch (char) {
-                0 => return NgTemplateTokenizerErrors.EofInTag,
+                0 => return NgTemplateLexerErrors.EofInTag,
                 '\'', '<', '"' => {
-                    return NgTemplateTokenizerErrors.UnexpectedCharacterInAttributeName;
+                    return NgTemplateLexerErrors.UnexpectedCharacterInAttributeName;
                 },
                 '/', '>' => {
                     return tokens.Attribute.init(self.buffer[start..self.index], "");
@@ -510,7 +510,7 @@ const Tokenizer = struct {
         }
     }
 
-    pub fn parse_attribute_value(self: *Tokenizer) ![]const u8 {
+    pub fn parse_attribute_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // remove white space characters before the value parsing
@@ -533,7 +533,7 @@ const Tokenizer = struct {
                 return self.parse_double_quoted_value();
             },
             '>' => {
-                return NgTemplateTokenizerErrors.MissingAttributeValue;
+                return NgTemplateLexerErrors.MissingAttributeValue;
             },
             else => {
                 return self.parse_unquoted_value();
@@ -541,7 +541,7 @@ const Tokenizer = struct {
         }
     }
 
-    pub fn parse_single_quoted_value(self: *Tokenizer) ![]const u8 {
+    pub fn parse_single_quoted_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute single quoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '\'' character
@@ -554,7 +554,7 @@ const Tokenizer = struct {
 
             switch (char) {
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 '\'' => {
                     const end = self.index;
@@ -566,7 +566,7 @@ const Tokenizer = struct {
         }
     }
 
-    pub fn parse_double_quoted_value(self: *Tokenizer) ![]const u8 {
+    pub fn parse_double_quoted_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute double quoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '"' character
@@ -579,7 +579,7 @@ const Tokenizer = struct {
 
             switch (char) {
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 '"' => {
                     const end = self.index;
@@ -591,7 +591,7 @@ const Tokenizer = struct {
         }
     }
 
-    pub fn parse_unquoted_value(self: *Tokenizer) ![]const u8 {
+    pub fn parse_unquoted_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute unquoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
         const start = self.index;
 
@@ -600,13 +600,13 @@ const Tokenizer = struct {
 
             switch (char) {
                 0 => {
-                    return NgTemplateTokenizerErrors.EofInTag;
+                    return NgTemplateLexerErrors.EofInTag;
                 },
                 TAB, LINE_FEED, FORM_FEED, SPACE, '>' => {
                     return self.buffer[start..self.index];
                 },
                 '"', '\'', '`', '<', '=' => {
-                    return NgTemplateTokenizerErrors.UnexpectedCharacterInUnquotedAttributeValue;
+                    return NgTemplateLexerErrors.UnexpectedCharacterInUnquotedAttributeValue;
                 },
                 else => {},
             }

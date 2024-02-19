@@ -1,6 +1,6 @@
 const std = @import("std");
 const fs = std.fs;
-const tokenizer = @import("parser/tokenizer.zig");
+const tokenizer = @import("parser/lexer.zig");
 const token = @import("parser/token.zig");
 
 pub fn main() !void {
