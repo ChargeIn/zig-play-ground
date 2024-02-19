@@ -1,3 +1,7 @@
+//
+// Copyright (c) Florian Plesker
+// florian.plesker@web.de
+//
 const std = @import("std");
 const tokens = @import("token.zig");
 const Token = tokens.NgTemplateToken;
@@ -95,7 +99,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_text(self: *Lexer) Token {
+    fn parse_text(self: *Lexer) Token {
         std.debug.print("Started parsing text: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         var char = self.buffer[self.index];
@@ -108,7 +112,7 @@ const Lexer = struct {
         return Token{ .text = self.buffer[start..self.index] };
     }
 
-    pub fn parse_tag(self: *Lexer, allocator: std.mem.Allocator) !Token {
+    fn parse_tag(self: *Lexer, allocator: std.mem.Allocator) !Token {
         std.debug.print("Started parsing tag : Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '<' token
@@ -138,7 +142,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_markup(self: *Lexer) !Token {
+    fn parse_markup(self: *Lexer) !Token {
         std.debug.print("Started parsing markup: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '!' character
@@ -162,7 +166,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_comment(self: *Lexer) !Token {
+    fn parse_comment(self: *Lexer) !Token {
         // skip '-' character
         self.index += 1;
 
@@ -205,7 +209,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_doc_type(self: *Lexer) !Token {
+    fn parse_doc_type(self: *Lexer) !Token {
         // Note: Since this token is not really used in the context of angular templates we will not validate it but
         // keep the content as string
         self.index += 1;
@@ -263,7 +267,7 @@ const Lexer = struct {
         return Token{ .doc_type = self.buffer[start..(self.index - 1)] };
     }
 
-    pub fn parse_cdata(self: *Lexer) !Token {
+    fn parse_cdata(self: *Lexer) !Token {
         // Note: Since this token is not really used in the context of angular templates we will not validate it but
         // keep the content as string
         self.index += 1;
@@ -341,7 +345,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_open_tag(self: *Lexer, allocator: std.mem.Allocator) !Token {
+    fn parse_open_tag(self: *Lexer, allocator: std.mem.Allocator) !Token {
         std.debug.print("Started parsing open tag: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         const name = try self.parse_tag_name();
@@ -365,7 +369,7 @@ const Lexer = struct {
         return Token{ .start_tag = tokens.StartTag.init(name, self_closing, attributes) };
     }
 
-    pub fn parse_closing_tag(self: *Lexer) !Token {
+    fn parse_closing_tag(self: *Lexer) !Token {
         std.debug.print("Started parsing closing tag: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '/' token
@@ -394,7 +398,7 @@ const Lexer = struct {
     }
 
     // Note: Assumes that the first character is ASCII alpha
-    pub fn parse_tag_name(self: *Lexer) ![]const u8 {
+    fn parse_tag_name(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing tag name: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         const start = self.index;
@@ -419,7 +423,7 @@ const Lexer = struct {
         return self.buffer[start..self.index];
     }
 
-    pub fn parse_attributes(self: *Lexer, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(tokens.Attribute) {
+    fn parse_attributes(self: *Lexer, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(tokens.Attribute) {
         std.debug.print("Started parsing attributes: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         var attribute_list = std.ArrayListUnmanaged(tokens.Attribute){};
@@ -456,7 +460,7 @@ const Lexer = struct {
         return attribute_list;
     }
 
-    pub fn parse_attribute(self: *Lexer) !tokens.Attribute {
+    fn parse_attribute(self: *Lexer) !tokens.Attribute {
         std.debug.print("Started parsing attribute: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
         const start = self.index;
 
@@ -510,7 +514,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_attribute_value(self: *Lexer) ![]const u8 {
+    fn parse_attribute_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // remove white space characters before the value parsing
@@ -541,7 +545,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_single_quoted_value(self: *Lexer) ![]const u8 {
+    fn parse_single_quoted_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute single quoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '\'' character
@@ -566,7 +570,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_double_quoted_value(self: *Lexer) ![]const u8 {
+    fn parse_double_quoted_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute double quoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
 
         // skip '"' character
@@ -591,7 +595,7 @@ const Lexer = struct {
         }
     }
 
-    pub fn parse_unquoted_value(self: *Lexer) ![]const u8 {
+    fn parse_unquoted_value(self: *Lexer) ![]const u8 {
         std.debug.print("Started parsing attribute unquoted value: Line: {any} Char: '{c}'\n", .{ self.index, self.buffer[self.index] });
         const start = self.index;
 

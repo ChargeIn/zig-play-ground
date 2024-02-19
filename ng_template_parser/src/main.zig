@@ -1,3 +1,7 @@
+//
+// Copyright (c) Florian Plesker
+// florian.plesker@web.de
+//
 const std = @import("std");
 const fs = std.fs;
 const tokenizer = @import("parser/lexer.zig");

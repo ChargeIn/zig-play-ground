@@ -1,3 +1,7 @@
+//
+// Copyright (c) Florian Plesker
+// florian.plesker@web.de
+//
 const std = @import("std");
 
 pub const StartTag = struct {

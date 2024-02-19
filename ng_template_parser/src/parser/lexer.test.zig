@@ -1,3 +1,7 @@
+//
+// Copyright (c) Florian Plesker
+// florian.plesker@web.de
+//
 const std = @import("std");
 const tokens = @import("token.zig");
 const Token = tokens.NgTemplateToken;
