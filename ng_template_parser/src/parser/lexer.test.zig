@@ -99,9 +99,11 @@ pub fn test_equal_tokens(t1: Token, t2: Token) !void {
             return err;
         };
     } else if (t1 == .eof and t2 == .eof) {
-        // accept
+        return;
     } else if (t1 == .doc_type and t2 == .doc_type) {
-        // TODO
+        // TODO;
+    } else {
+        return error.UnequalTokenType;
     }
 }
 

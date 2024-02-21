@@ -12,7 +12,7 @@ const Token = @import("token.zig").NgTemplateToken;
 pub const NgTemplateParser = Parser;
 
 const Parser = struct {
-    node: ?HtmlElement,
+    node: ?*HtmlElement,
 
     pub fn init() Parser {
         return Parser{
@@ -26,12 +26,13 @@ const Parser = struct {
         var lexer = Lexer.init(buffer);
         var token = try lexer.next(allocator);
 
-        while (token != .eof) {
-            token = try lexer.next(allocator);
+        while (token != .eof) : (token = try lexer.next(allocator)) {
+            std.debug.print("Parsed token: {any}", .{token});
+            std.debug.print("node token: {any}", .{self.node});
 
             switch (token) {
                 .start_tag => |*tag| {
-                    const html_element = Node{
+                    var html_element = Node{
                         .html_element = HtmlElement{
                             .name = tag.name,
                             .attributes = tag.attributes,
@@ -41,20 +42,20 @@ const Parser = struct {
                     };
 
                     if (self.node) |*node| {
-                        try node.children.append(allocator, html_element);
+                        try node.*.children.append(allocator, html_element);
                     } else {
                         try elements.append(allocator, html_element);
                     }
 
                     if (tag.self_closing == false) {
-                        self.node = html_element.html_element;
+                        self.node = &html_element.html_element;
                     }
                 },
                 .end_tag => {},
                 .comment => {
                     const comment = Node{ .doc_type = token.comment };
                     if (self.node) |*node| {
-                        try node.children.append(allocator, comment);
+                        try node.*.children.append(allocator, comment);
                     } else {
                         try elements.append(allocator, comment);
                     }
@@ -62,7 +63,7 @@ const Parser = struct {
                 .doc_type => {
                     const doc_type = Node{ .doc_type = token.doc_type };
                     if (self.node) |*node| {
-                        try node.children.append(allocator, doc_type);
+                        try node.*.children.append(allocator, doc_type);
                     } else {
                         try elements.append(allocator, doc_type);
                     }
@@ -70,7 +71,7 @@ const Parser = struct {
                 .cdata => {
                     const cdata = Node{ .cdata = token.cdata };
                     if (self.node) |*node| {
-                        try node.children.append(allocator, cdata);
+                        try node.*.children.append(allocator, cdata);
                     } else {
                         try elements.append(allocator, cdata);
                     }
@@ -78,20 +79,25 @@ const Parser = struct {
                 .text => {
                     const text = Node{ .text = token.text };
                     if (self.node) |*node| {
-                        try node.children.append(allocator, text);
+                        try node.*.children.append(allocator, text);
                     } else {
                         try elements.append(allocator, text);
                     }
                 },
                 .eof => {
                     if (self.node) |*node| {
-                        try node.children.append(allocator, Node.eof);
+                        try node.*.children.append(allocator, Node.eof);
                     } else {
                         try elements.append(allocator, Node.eof);
                     }
                 },
             }
         }
+
+        for (elements.items, 0..) |*el, i| {
+            std.debug.print("Element {d}: {any}\n", .{ i, el });
+        }
+
         return elements;
     }
 };

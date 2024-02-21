@@ -35,7 +35,7 @@ pub const HtmlElement = struct {
             try writer.print(" ", .{});
 
             for (value.children.items, 0..) |child, i| {
-                try child.format(fmt, opt, writer);
+                try writer.print("{any}", .{child});
                 if (i < value.children.items.len - 1) {
                     try writer.print(", ", .{});
                 }
