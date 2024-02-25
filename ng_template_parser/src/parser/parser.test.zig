@@ -43,6 +43,12 @@ fn test_equal_nodes(n1: Node, n2: Node) !void {
             std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
             return err;
         };
+    }
+    if (n1 == .text and n2 == .text) {
+        expect(std.mem.eql(u8, n1.text, n2.text)) catch |err| {
+            std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
+            return err;
+        };
     } else {
         return error.InvalidNodeType;
     }
@@ -55,7 +61,7 @@ test "rawtext" {
     const content: [:0]const u8 = "Some random html text.";
 
     const nodes = [_]Node{
-        Node{ .text = "Some random html test" },
+        Node{ .text = "Some random html text." },
     };
 
     try test_equals(content, &nodes);

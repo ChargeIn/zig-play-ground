@@ -12,23 +12,28 @@ const Token = @import("token.zig").NgTemplateToken;
 pub const NgTemplateParser = Parser;
 
 const Parser = struct {
-    node: ?*HtmlElement,
+    elements: std.ArrayListUnmanaged(Node),
+    current_layer: *std.ArrayListUnmanaged(Node),
 
     pub fn init() Parser {
+        var elements = std.ArrayListUnmanaged(Node){};
+
         return Parser{
-            .node = null,
+            .elements = elements,
+            .current_layer = &elements,
         };
     }
 
     pub fn parse(self: *Parser, buffer: [:0]const u8, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Node) {
-        var elements = std.ArrayListUnmanaged(Node){};
-
         var lexer = Lexer.init(buffer);
         var token = try lexer.next(allocator);
 
+        self.elements = std.ArrayListUnmanaged(Node){};
+        self.current_layer = &self.elements;
+
         while (token != .eof) : (token = try lexer.next(allocator)) {
-            std.debug.print("Parsed token: {any}", .{token});
-            std.debug.print("node token: {any}", .{self.node});
+            std.debug.print("Parsed token: {any}\n", .{token});
+            std.debug.print("node token: {any}\n", .{self.elements});
 
             switch (token) {
                 .start_tag => |*tag| {
@@ -41,63 +46,35 @@ const Parser = struct {
                         },
                     };
 
-                    if (self.node) |*node| {
-                        try node.*.children.append(allocator, html_element);
-                    } else {
-                        try elements.append(allocator, html_element);
-                    }
+                    try self.current_layer.*.append(allocator, html_element);
 
                     if (tag.self_closing == false) {
-                        self.node = &html_element.html_element;
+                        self.current_layer = &self.current_layer.items[self.current_layer.items.len - 1].html_element.children;
                     }
                 },
                 .end_tag => {},
                 .comment => {
-                    const comment = Node{ .doc_type = token.comment };
-                    if (self.node) |*node| {
-                        try node.*.children.append(allocator, comment);
-                    } else {
-                        try elements.append(allocator, comment);
-                    }
+                    try self.current_layer.*.append(allocator, Node{ .doc_type = token.comment });
                 },
                 .doc_type => {
-                    const doc_type = Node{ .doc_type = token.doc_type };
-                    if (self.node) |*node| {
-                        try node.*.children.append(allocator, doc_type);
-                    } else {
-                        try elements.append(allocator, doc_type);
-                    }
+                    try self.current_layer.*.append(allocator, Node{ .doc_type = token.doc_type });
                 },
                 .cdata => {
-                    const cdata = Node{ .cdata = token.cdata };
-                    if (self.node) |*node| {
-                        try node.*.children.append(allocator, cdata);
-                    } else {
-                        try elements.append(allocator, cdata);
-                    }
+                    try self.current_layer.*.append(allocator, Node{ .cdata = token.cdata });
                 },
                 .text => {
-                    const text = Node{ .text = token.text };
-                    if (self.node) |*node| {
-                        try node.*.children.append(allocator, text);
-                    } else {
-                        try elements.append(allocator, text);
-                    }
+                    try self.current_layer.*.append(allocator, Node{ .text = token.text });
                 },
                 .eof => {
-                    if (self.node) |*node| {
-                        try node.*.children.append(allocator, Node.eof);
-                    } else {
-                        try elements.append(allocator, Node.eof);
-                    }
+                    try self.current_layer.*.append(allocator, Node.eof);
                 },
             }
         }
 
-        for (elements.items, 0..) |*el, i| {
+        for (self.elements.items, 0..) |*el, i| {
             std.debug.print("Element {d}: {any}\n", .{ i, el });
         }
 
-        return elements;
+        return self.elements;
     }
 };
