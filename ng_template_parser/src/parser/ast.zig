@@ -18,29 +18,30 @@ pub const HtmlElement = struct {
         );
 
         if (value.attributes.items.len > 0) {
-            try writer.print(" ", .{});
+            try writer.print("\n", .{});
 
             for (value.attributes.items, 0..) |attr, i| {
+                try writer.print("  ", .{});
                 try attr.format(fmt, opt, writer);
                 if (i < value.attributes.items.len - 1) {
-                    try writer.print(", ", .{});
+                    try writer.print(",\n  ", .{});
                 }
             }
-            try writer.print(" ", .{});
+            try writer.print("\n", .{});
         }
 
         try writer.print("], children: [", .{});
 
         if (value.children.items.len > 0) {
-            try writer.print(" ", .{});
+            try writer.print("\n", .{});
 
             for (value.children.items, 0..) |child, i| {
-                try writer.print("{any}", .{child});
+                try writer.print("  {any}", .{child});
                 if (i < value.children.items.len - 1) {
-                    try writer.print(", ", .{});
+                    try writer.print(",\n", .{});
                 }
             }
-            try writer.print(" ", .{});
+            try writer.print("\n", .{});
         }
 
         try writer.print("] }}", .{});
@@ -48,6 +49,11 @@ pub const HtmlElement = struct {
 
     pub fn deinit(self: *HtmlElement, allocator: std.mem.Allocator) void {
         self.attributes.deinit(allocator);
+
+        for (self.children.items) |*child| {
+            child.deinit(allocator);
+        }
+
         self.children.deinit(allocator);
     }
 };

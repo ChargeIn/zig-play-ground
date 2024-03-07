@@ -12,28 +12,21 @@ const Token = @import("token.zig").NgTemplateToken;
 pub const NgTemplateParser = Parser;
 
 const Parser = struct {
-    elements: std.ArrayListUnmanaged(Node),
-    current_layer: *std.ArrayListUnmanaged(Node),
+    lexer: Lexer,
 
-    pub fn init() Parser {
-        var elements = std.ArrayListUnmanaged(Node){};
-
-        return Parser{
-            .elements = elements,
-            .current_layer = &elements,
-        };
+    pub fn init(buffer: [:0]const u8) Parser {
+        var lexer = Lexer.init(buffer);
+        return Parser{ .lexer = lexer };
     }
 
-    pub fn parse(self: *Parser, buffer: [:0]const u8, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Node) {
-        var lexer = Lexer.init(buffer);
-        var token = try lexer.next(allocator);
+    pub fn parse(self: *Parser, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Node) {
+        var token = try self.lexer.next(allocator);
 
-        self.elements = std.ArrayListUnmanaged(Node){};
-        self.current_layer = &self.elements;
+        var elements = std.ArrayListUnmanaged(Node){};
 
-        while (token != .eof) : (token = try lexer.next(allocator)) {
+        while (token != .eof) : (token = try self.lexer.next(allocator)) {
             std.debug.print("Parsed token: {any}\n", .{token});
-            std.debug.print("node token: {any}\n", .{self.elements});
+            std.debug.print("node token: {any}\n", .{elements});
 
             switch (token) {
                 .start_tag => |*tag| {
@@ -46,35 +39,36 @@ const Parser = struct {
                         },
                     };
 
-                    try self.current_layer.*.append(allocator, html_element);
-
                     if (tag.self_closing == false) {
-                        self.current_layer = &self.current_layer.items[self.current_layer.items.len - 1].html_element.children;
+                        html_element.html_element.children = try self.parse(allocator);
                     }
+                    try elements.append(allocator, html_element);
                 },
-                .end_tag => {},
+                .end_tag => {
+                    return elements;
+                },
                 .comment => {
-                    try self.current_layer.*.append(allocator, Node{ .doc_type = token.comment });
+                    try elements.append(allocator, Node{ .doc_type = token.comment });
                 },
                 .doc_type => {
-                    try self.current_layer.*.append(allocator, Node{ .doc_type = token.doc_type });
+                    try elements.append(allocator, Node{ .doc_type = token.doc_type });
                 },
                 .cdata => {
-                    try self.current_layer.*.append(allocator, Node{ .cdata = token.cdata });
+                    try elements.append(allocator, Node{ .cdata = token.cdata });
                 },
                 .text => {
-                    try self.current_layer.*.append(allocator, Node{ .text = token.text });
+                    try elements.append(allocator, Node{ .text = token.text });
                 },
                 .eof => {
-                    try self.current_layer.*.append(allocator, Node.eof);
+                    try elements.append(allocator, Node.eof);
                 },
             }
         }
 
-        for (self.elements.items, 0..) |*el, i| {
+        for (elements.items, 0..) |*el, i| {
             std.debug.print("Element {d}: {any}\n", .{ i, el });
         }
 
-        return self.elements;
+        return elements;
     }
 };

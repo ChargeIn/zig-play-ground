@@ -17,9 +17,9 @@ const expect = std.testing.expect;
 fn test_equals(content: [:0]const u8, nodes: []const Node) !void {
     const allocator = std.testing.allocator;
 
-    var parser = Parser.init();
+    var parser = Parser.init(content);
 
-    var elements = try parser.parse(content, allocator);
+    var elements = try parser.parse(allocator);
 
     try expectEqual(elements.items.len, nodes.len);
 
@@ -83,7 +83,7 @@ test "rawtext" {
 }
 
 test "div" {
-    const content: [:0]const u8 = "<div><div>Hello</div> World<div/></div>";
+    const content: [:0]const u8 = "<div><div>Hello</div> World<custom/></div>";
 
     var firstDiv = HtmlElement{
         .name = "div",
@@ -100,10 +100,10 @@ test "div" {
     };
 
     const text1 = Node{ .text = "Hello" };
-    const text2 = Node{ .text = "World" };
+    const text2 = Node{ .text = " World" };
 
     const thirdDiv = HtmlElement{
-        .name = "div",
+        .name = "custom",
         .self_closing = true,
         .attributes = std.ArrayListUnmanaged(Attribute){},
         .children = std.ArrayListUnmanaged(Node){},
@@ -115,8 +115,8 @@ test "div" {
     try firstDiv.children.append(allocator, Node{ .html_element = thirdDiv });
     defer firstDiv.children.deinit(allocator);
 
-    try secondDiv.children.append(allocator, text1);
-    defer secondDiv.children.deinit(allocator);
+    try firstDiv.children.items[0].html_element.children.append(allocator, text1);
+    defer firstDiv.children.items[0].html_element.children.deinit(allocator);
 
     var nodes = [_]Node{Node{ .html_element = firstDiv }};
 
