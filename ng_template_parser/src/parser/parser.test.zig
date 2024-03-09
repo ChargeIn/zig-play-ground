@@ -5,9 +5,10 @@
 const std = @import("std");
 const Parser = @import("parser.zig").NgTemplateParser;
 const ast = @import("ast.zig");
-const Attribute = @import("token.zig").Attribute;
 const Node = ast.NgTemplateNode;
 const HtmlElement = ast.HtmlElement;
+const HtmlAttribute = ast.HtmlAttribute;
+const HtmlAttributeType = ast.HtmlAttributeType;
 const expectEqual = std.testing.expectEqual;
 const expect = std.testing.expect;
 
@@ -83,33 +84,71 @@ test "rawtext" {
 }
 
 test "div" {
-    const content: [:0]const u8 = "<div><div>Hello</div> World<custom/></div>";
+    const content: [:0]const u8 = "<div><div>Hello</div> World<custom property staticInput=\"H\" [simpleBinding]=\"E\" [(doubleBinding)]=\"LL\" (output)=\"O\"/></div>";
 
     var firstDiv = HtmlElement{
         .name = "div",
         .self_closing = false,
-        .attributes = std.ArrayListUnmanaged(Attribute){},
+        .attributes = std.ArrayListUnmanaged(HtmlAttribute){},
         .children = std.ArrayListUnmanaged(Node){},
     };
 
     var secondDiv = HtmlElement{
         .name = "div",
         .self_closing = false,
-        .attributes = std.ArrayListUnmanaged(Attribute){},
+        .attributes = std.ArrayListUnmanaged(HtmlAttribute){},
         .children = std.ArrayListUnmanaged(Node){},
     };
 
     const text1 = Node{ .text = "Hello" };
     const text2 = Node{ .text = " World" };
 
-    const thirdDiv = HtmlElement{
+    var thirdDiv = HtmlElement{
         .name = "custom",
         .self_closing = true,
-        .attributes = std.ArrayListUnmanaged(Attribute){},
+        .attributes = std.ArrayListUnmanaged(HtmlAttribute){},
         .children = std.ArrayListUnmanaged(Node){},
     };
 
+    const attr1 = HtmlAttribute{
+        .name = "property",
+        .value = "",
+        .type = HtmlAttributeType.static,
+    };
+
+    const attr2 = HtmlAttribute{
+        .name = "staticInput",
+        .value = "H",
+        .type = HtmlAttributeType.static,
+    };
+
+    const attr3 = HtmlAttribute{
+        .name = "simpleBinding",
+        .value = "E",
+        .type = HtmlAttributeType.one_way,
+    };
+
+    const attr4 = HtmlAttribute{
+        .name = "doubleBinding",
+        .value = "LL",
+        .type = HtmlAttributeType.two_way,
+    };
+
+    const attr5 = HtmlAttribute{
+        .name = "output",
+        .value = "O",
+        .type = HtmlAttributeType.output,
+    };
+
     const allocator = std.testing.allocator;
+
+    try thirdDiv.attributes.append(allocator, attr1);
+    try thirdDiv.attributes.append(allocator, attr2);
+    try thirdDiv.attributes.append(allocator, attr3);
+    try thirdDiv.attributes.append(allocator, attr4);
+    try thirdDiv.attributes.append(allocator, attr5);
+    defer thirdDiv.attributes.deinit(allocator);
+
     try firstDiv.children.append(allocator, Node{ .html_element = secondDiv });
     try firstDiv.children.append(allocator, text2);
     try firstDiv.children.append(allocator, Node{ .html_element = thirdDiv });

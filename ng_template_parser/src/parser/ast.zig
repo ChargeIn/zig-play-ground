@@ -8,7 +8,7 @@ const Attribute = @import("token.zig").Attribute;
 pub const HtmlElement = struct {
     name: []const u8,
     self_closing: bool,
-    attributes: std.ArrayListUnmanaged(Attribute),
+    attributes: std.ArrayListUnmanaged(HtmlAttribute),
     children: std.ArrayListUnmanaged(NgTemplateNode),
 
     pub fn format(value: HtmlElement, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {
@@ -18,7 +18,7 @@ pub const HtmlElement = struct {
         );
 
         if (value.attributes.items.len > 0) {
-            try writer.print("\n", .{});
+            try writer.print("\n  ", .{});
 
             for (value.attributes.items, 0..) |attr, i| {
                 try writer.print("  ", .{});
@@ -55,6 +55,52 @@ pub const HtmlElement = struct {
         }
 
         self.children.deinit(allocator);
+    }
+};
+
+pub const HtmlAttributeType = enum {
+    static,
+    one_way,
+    two_way,
+    output,
+};
+
+pub const HtmlAttribute = struct {
+    name: []const u8,
+    value: []const u8,
+    type: HtmlAttributeType,
+
+    pub fn init(attr: Attribute) HtmlAttribute {
+        var attrType: HtmlAttributeType = HtmlAttributeType.static;
+        var startOffset: usize = 0;
+
+        if (attr.name[startOffset] == '[') {
+            attrType = HtmlAttributeType.one_way;
+            startOffset += 1;
+        }
+
+        if (attr.name[startOffset] == '(') {
+            startOffset += 1;
+
+            if (attrType == HtmlAttributeType.static) {
+                attrType = HtmlAttributeType.output;
+            } else {
+                attrType = HtmlAttributeType.two_way;
+            }
+        }
+
+        return HtmlAttribute{
+            .name = attr.name[startOffset..(attr.name.len - startOffset)],
+            .value = attr.value,
+            .type = attrType,
+        };
+    }
+
+    pub fn format(value: HtmlAttribute, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "HtmlAttribute {{ name: {s}, value: {s}, type: {any} }}",
+            .{ value.name, value.value, value.type },
+        );
     }
 };
 

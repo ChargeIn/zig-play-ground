@@ -7,6 +7,7 @@ const Lexer = @import("lexer.zig").NgTemplateLexer;
 const ast = @import("ast.zig");
 const Node = ast.NgTemplateNode;
 const HtmlElement = ast.HtmlElement;
+const HtmlAttribute = ast.HtmlAttribute;
 const Token = @import("token.zig").NgTemplateToken;
 
 pub const NgTemplateParser = Parser;
@@ -30,10 +31,17 @@ const Parser = struct {
 
             switch (token) {
                 .start_tag => |*tag| {
+                    var attributes = try std.ArrayListUnmanaged(HtmlAttribute).initCapacity(allocator, tag.attributes.items.len);
+                    defer tag.attributes.deinit(allocator);
+
+                    for (tag.attributes.items) |attr| {
+                        attributes.appendAssumeCapacity(HtmlAttribute.init(attr));
+                    }
+
                     var html_element = Node{
                         .html_element = HtmlElement{
                             .name = tag.name,
-                            .attributes = tag.attributes,
+                            .attributes = attributes,
                             .self_closing = tag.self_closing,
                             .children = std.ArrayListUnmanaged(Node){},
                         },
