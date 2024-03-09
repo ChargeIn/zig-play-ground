@@ -60,6 +60,28 @@ fn test_equal_nodes(n1: Node, n2: Node) !void {
         for (n1.html_element.children.items, 0..) |item, i| {
             try test_equal_nodes(item, n2.html_element.children.items[i]);
         }
+
+        for (n1.html_element.attributes.items, 0..) |attr1, i| {
+            expect(std.mem.eql(u8, attr1.name, n2.html_element.attributes.items[i].name)) catch |err| {
+                std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
+                return err;
+            };
+
+            expect(std.mem.eql(u8, attr1.value, n2.html_element.attributes.items[i].value)) catch |err| {
+                std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
+                return err;
+            };
+
+            expectEqual(attr1.has_value, n2.html_element.attributes.items[i].has_value) catch |err| {
+                std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
+                return err;
+            };
+
+            expectEqual(attr1.type, n2.html_element.attributes.items[i].type) catch |err| {
+                std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
+                return err;
+            };
+        }
     } else if (n1 == .text and n2 == .text) {
         expect(std.mem.eql(u8, n1.text, n2.text)) catch |err| {
             std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
@@ -114,30 +136,35 @@ test "div" {
         .name = "property",
         .value = "",
         .type = HtmlAttributeType.static,
+        .has_value = false,
     };
 
     const attr2 = HtmlAttribute{
         .name = "staticInput",
         .value = "H",
         .type = HtmlAttributeType.static,
+        .has_value = true,
     };
 
     const attr3 = HtmlAttribute{
         .name = "simpleBinding",
         .value = "E",
         .type = HtmlAttributeType.one_way,
+        .has_value = true,
     };
 
     const attr4 = HtmlAttribute{
         .name = "doubleBinding",
         .value = "LL",
         .type = HtmlAttributeType.two_way,
+        .has_value = true,
     };
 
     const attr5 = HtmlAttribute{
         .name = "output",
         .value = "O",
         .type = HtmlAttributeType.output,
+        .has_value = true,
     };
 
     const allocator = std.testing.allocator;

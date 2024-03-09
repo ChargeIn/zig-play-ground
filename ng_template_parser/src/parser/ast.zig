@@ -69,6 +69,7 @@ pub const HtmlAttribute = struct {
     name: []const u8,
     value: []const u8,
     type: HtmlAttributeType,
+    has_value: bool, // used to differentiate between attirbutes with empty values (e.g test="") and no values (e.g. test )
 
     pub fn init(attr: Attribute) HtmlAttribute {
         var attrType: HtmlAttributeType = HtmlAttributeType.static;
@@ -93,6 +94,7 @@ pub const HtmlAttribute = struct {
             .name = attr.name[startOffset..(attr.name.len - startOffset)],
             .value = attr.value,
             .type = attrType,
+            .has_value = attr.has_value,
         };
     }
 

@@ -46,11 +46,21 @@ pub const StartTag = struct {
 pub const Attribute = struct {
     name: []const u8,
     value: []const u8,
+    has_value: bool,
+
+    pub fn initNoValue(name: []const u8) Attribute {
+        return Attribute{
+            .name = name,
+            .value = "",
+            .has_value = false,
+        };
+    }
 
     pub fn init(name: []const u8, value: []const u8) Attribute {
         return Attribute{
             .name = name,
             .value = value,
+            .has_value = true,
         };
     }
 

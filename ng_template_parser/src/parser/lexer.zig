@@ -476,7 +476,7 @@ const Lexer = struct {
                     return NgTemplateLexerErrors.UnexpectedCharacterInAttributeName;
                 },
                 '/', '>' => {
-                    return tokens.Attribute.init(self.buffer[start..self.index], "");
+                    return tokens.Attribute.initNoValue(self.buffer[start..self.index]);
                 },
                 TAB, LINE_FEED, FORM_FEED, SPACE, '=' => {
                     break;
@@ -496,7 +496,7 @@ const Lexer = struct {
                     return NgTemplateLexerErrors.UnexpectedCharacterInAttributeName;
                 },
                 '/', '>' => {
-                    return tokens.Attribute.init(self.buffer[start..self.index], "");
+                    return tokens.Attribute.initNoValue(self.buffer[start..self.index]);
                 },
                 '=' => {
                     const name = self.buffer[start..name_end];
@@ -508,7 +508,7 @@ const Lexer = struct {
                 },
                 TAB, LINE_FEED, FORM_FEED, SPACE => {},
                 else => {
-                    return tokens.Attribute.init(self.buffer[start..name_end], "");
+                    return tokens.Attribute.initNoValue(self.buffer[start..name_end]);
                 },
             }
         }
