@@ -4,14 +4,17 @@
 //
 const std = @import("std");
 const fs = std.fs;
-const tokenizer = @import("parser/lexer.zig");
-const token = @import("parser/token.zig");
+const tokenizer = @import("ng-template/lexer.zig");
+const token = @import("ng-template/token.zig");
+const Formatter = @import("ng-template/formatter.zig").NgTemplateFormatter;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == .ok);
 
     const allocator = gpa.allocator();
+
+    _ = Formatter.init(.{ .tab_width = 4 });
 
     // TODO specific file parsing
     const content: [:0]u8 = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
@@ -22,7 +25,7 @@ pub fn main() !void {
 
     std.log.info("Content: {s}", .{content});
 
-    var ngTemplateTokenizer = tokenizer.NgTemplateTokenzier.init(content);
+    var ngTemplateTokenizer = tokenizer.NgTemplateLexer.init(content);
 
     var t = try ngTemplateTokenizer.next(allocator);
     while (t != token.NgTemplateToken.eof) {

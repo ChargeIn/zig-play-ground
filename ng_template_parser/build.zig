@@ -15,6 +15,24 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const options_module = b.createModule(.{
+        .source_file = .{ .path = "./src/options/options.zig" },
+        .dependencies = &.{},
+    });
+
+    const utils_module = b.createModule(.{
+        .source_file = .{ .path = "./src/utils/string.zig" },
+        .dependencies = &.{},
+    });
+
+    const template_module = b.createModule(.{
+        .source_file = .{ .path = "./src/ng-template/formatter.zig" },
+        .dependencies = &.{
+            .{ .name = "options", .module = options_module },
+            .{ .name = "utils", .module = utils_module },
+        },
+    });
+
     const exe = b.addExecutable(.{
         .name = "html_parser",
         // In this case the main source file is merely a path, however, in more
@@ -23,6 +41,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe.addModule("options", options_module);
+    exe.addModule("template", template_module);
+    exe.addModule("utils", utils_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -55,10 +76,12 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/ng-template/formatter.test.zig" },
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.addModule("options", options_module);
+    unit_tests.addModule("utils", utils_module);
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
