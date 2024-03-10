@@ -20,16 +20,16 @@ pub const FileString = struct {
     pub fn empty(allocator: std.mem.Allocator) FileString {
         return .{
             .buffer = &[0]u8{},
-            .allocator = all,
+            .allocator = allocator,
             .size = 0,
             .batch_size = 1000,
             .end = 0,
         };
     }
 
-    pub fn init(self: *FileString, initial_size: usize) !FileString {
+    pub fn init(self: *FileString, initial_size: usize) !void {
         self.size = initial_size + self.batch_size;
-        self.buffer = try self.allocator.alloc(u8, size);
+        self.buffer = try self.allocator.alloc(u8, self.size);
     }
 
     pub fn deinit(self: *FileString) void {
@@ -42,7 +42,7 @@ pub const FileString = struct {
     }
 
     pub fn concat(self: *FileString, content: []const u8) !void {
-        if (self.size + content.len > self.buffer.len) {
+        if (self.end + content.len > self.size) {
             try self.allocate(content.len);
         }
 
@@ -55,5 +55,18 @@ pub const FileString = struct {
 
     pub fn toString(self: *FileString) []u8 {
         return self.buffer[0..self.end];
+    }
+
+    pub fn indent(self: *FileString, count: usize) !void {
+        const new_end = self.end + count;
+
+        if (new_end > self.size) {
+            try self.allocate(count);
+        }
+
+        for (self.end..new_end) |i| {
+            self.buffer[i] = ' ';
+        }
+        self.end += count;
     }
 };
