@@ -26,9 +26,6 @@ const Parser = struct {
         var elements = std.ArrayListUnmanaged(Node){};
 
         while (token != .eof) : (token = try self.lexer.next(allocator)) {
-            std.debug.print("Parsed token: {any}\n", .{token});
-            std.debug.print("node token: {any}\n", .{elements});
-
             switch (token) {
                 .start_tag => |*tag| {
                     var attributes = try std.ArrayListUnmanaged(HtmlAttribute).initCapacity(allocator, tag.attributes.items.len);

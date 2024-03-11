@@ -3,12 +3,12 @@
 // florian.plesker@web.de
 //
 const std = @import("std");
-const tokens = @import("token.zig");
+const tokens = @import("ng_template").NgTemplateToken;
 const Token = tokens.NgTemplateToken;
 const StartTag = tokens.StartTag;
 const EndTag = tokens.EndTag;
 const Attribute = tokens.Attribute;
-const NgTemplateLexer = @import("lexer.zig").NgTemplateLexer;
+const NgTemplateLexer = @import("ng_template").NgTemplateLexer;
 const expectEqual = std.testing.expectEqual;
 const expect = std.testing.expect;
 
@@ -102,7 +102,13 @@ pub fn test_equal_tokens(t1: Token, t2: Token) !void {
         return;
     } else if (t1 == .doc_type and t2 == .doc_type) {
         // TODO;
+    } else if (t1 == .cdata and t2 == .cdata) {
+        expect(std.mem.eql(u8, t1.cdata, t2.cdata)) catch |err| {
+            std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ t1, t2 });
+            return err;
+        };
     } else {
+        std.debug.print("Error: Expected Equal Types '{any}' recieved '{any}'\n", .{ t1, t2 });
         return error.UnequalTokenType;
     }
 }
@@ -207,7 +213,7 @@ test "cdata" {
 test "parse all elements" {
     const allocator = std.testing.allocator;
 
-    const content: [:0]u8 = readFile("./src/tests/all-no-media-elements.html", allocator) catch |err| {
+    const content: [:0]u8 = readFile("tests/ng_template/data/all-no-media-elements.html", allocator) catch |err| {
         std.log.err("Could not read file: {any}", .{err});
         return;
     };

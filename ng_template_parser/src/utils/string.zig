@@ -41,6 +41,20 @@ pub const FileString = struct {
         self.buffer = try self.allocator.realloc(self.buffer, self.size);
     }
 
+    pub fn ensure_capacity(self: *FileString, count: usize) !void {
+        if (self.end + count > self.size) {
+            try self.allocate(count);
+        }
+    }
+
+    pub fn concat_assume_capacity(self: *FileString, content: []const u8) void {
+        var i: usize = 0;
+        while (i < content.len) : (i += 1) {
+            self.buffer[self.end + i] = content[i];
+        }
+        self.end += content.len;
+    }
+
     pub fn concat(self: *FileString, content: []const u8) !void {
         if (self.end + content.len > self.size) {
             try self.allocate(content.len);
@@ -63,6 +77,15 @@ pub const FileString = struct {
         if (new_end > self.size) {
             try self.allocate(count);
         }
+
+        for (self.end..new_end) |i| {
+            self.buffer[i] = ' ';
+        }
+        self.end += count;
+    }
+
+    pub fn indent_assume_capacity(self: *FileString, count: usize) void {
+        const new_end = self.end + count;
 
         for (self.end..new_end) |i| {
             self.buffer[i] = ' ';

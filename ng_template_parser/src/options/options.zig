@@ -4,9 +4,10 @@
 //
 pub const FormatterOptions = struct {
     tab_width: usize,
+    auto_self_close: bool,
 
     pub fn init() FormatterOptions {
         // TODO load from local file
-        return FormatterOptions{ .tab_width = 4 };
+        return FormatterOptions{ .tab_width = 4, .auto_self_close = true };
     }
 };

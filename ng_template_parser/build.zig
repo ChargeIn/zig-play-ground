@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const template_module = b.createModule(.{
-        .source_file = .{ .path = "./src/ng-template/formatter.zig" },
+        .source_file = .{ .path = "./src/ng_template/ng_template.zig" },
         .dependencies = &.{
             .{ .name = "options", .module = options_module },
             .{ .name = "utils", .module = utils_module },
@@ -76,12 +76,13 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/ng-template/formatter.test.zig" },
+        .root_source_file = .{ .path = "tests/tests.zig" },
         .target = target,
         .optimize = optimize,
     });
     unit_tests.addModule("options", options_module);
     unit_tests.addModule("utils", utils_module);
+    unit_tests.addModule("ng_template", template_module);
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

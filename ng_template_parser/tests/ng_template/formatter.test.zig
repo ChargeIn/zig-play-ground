@@ -3,7 +3,7 @@
 // florian.plesker@web.de
 //
 const std = @import("std");
-const Formatter = @import("formatter.zig").NgTemplateFormatter;
+const Formatter = @import("ng_template").NgTemplateFormatter;
 const Options = @import("options").FormatterOptions;
 
 // TESTING
@@ -13,7 +13,11 @@ const expect = std.testing.expect;
 test "should use tabWidth correctly" {
     const allocator = std.testing.allocator;
 
-    var formatter = Formatter.init(allocator, .{ .tab_width = 4 });
+    var options = Options.init();
+    options.tab_width = 4;
+
+    var formatter = try Formatter.init(allocator, options);
+    defer formatter.deinit();
 
     const content = "<div><div>Hello World</div></div>";
     const expected_content =

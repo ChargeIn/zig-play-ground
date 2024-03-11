@@ -3,8 +3,8 @@
 // florian.plesker@web.de
 //
 const std = @import("std");
-const Parser = @import("parser.zig").NgTemplateParser;
-const ast = @import("ast.zig");
+const Parser = @import("ng_template").NgTemplateParser;
+const ast = @import("ng_template").NgTemplateAst;
 const Node = ast.NgTemplateNode;
 const HtmlElement = ast.HtmlElement;
 const HtmlAttribute = ast.HtmlAttribute;
