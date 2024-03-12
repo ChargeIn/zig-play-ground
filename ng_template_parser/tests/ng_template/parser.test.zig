@@ -115,7 +115,7 @@ test "div" {
         .children = std.ArrayListUnmanaged(Node){},
     };
 
-    var secondDiv = HtmlElement{
+    const secondDiv = HtmlElement{
         .name = "div",
         .self_closing = false,
         .attributes = std.ArrayListUnmanaged(HtmlAttribute){},
