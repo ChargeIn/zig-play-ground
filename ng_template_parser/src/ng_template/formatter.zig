@@ -6,6 +6,7 @@ const std = @import("std");
 const Parser = @import("parser.zig").NgTemplateParser;
 const Options = @import("options").FormatterOptions;
 const FileString = @import("utils").FileString;
+const StringError = @import("utils").StringError;
 const Node = @import("ast.zig").NgTemplateNode;
 const HtmlElement = @import("ast.zig").HtmlElement;
 
@@ -17,12 +18,12 @@ const Formatter = struct {
     file_string: FileString,
     html_elements: std.StringHashMapUnmanaged(bool),
 
-    pub fn init(allocator: std.mem.Allocator, options: Options) !Formatter {
+    pub fn init(allocator: std.mem.Allocator, options: Options) StringError!Formatter {
         return .{
             .options = options,
             .allocator = allocator,
             .file_string = FileString.empty(allocator),
-            .html_elements = try create_html_elements(allocator),
+            .html_elements = try createHtmlElements(allocator),
         };
     }
 
@@ -42,48 +43,48 @@ const Formatter = struct {
         };
 
         for (elements.items) |*element| {
-            try self.visit_node(element, 0);
+            try self.visitNode(element, 0);
         }
 
         return self.file_string.toString();
     }
 
-    fn visit_node(self: *Formatter, element: *Node, indent: usize) !void {
+    fn visitNode(self: *Formatter, element: *Node, indent: usize) StringError!void {
         switch (element.*) {
             .html_element => {
-                try self.write_html_element(element.html_element, indent);
+                try self.writeHtmlElement(element.html_element, indent);
             },
             .comment => {
-                try self.write_comment(element, indent);
+                try self.writeComment(element, indent);
             },
             .text => {
-                try self.write_text(element, indent);
+                try self.writeText(element, indent);
             },
             else => {},
         }
     }
 
-    fn write_html_element(self: *Formatter, html_element: HtmlElement, indent: usize) !void {
+    fn writeHtmlElement(self: *Formatter, html_element: HtmlElement, indent: usize) StringError!void {
 
         // check if self closing or auto closing
-        if (html_element.self_closing or self.should_auto_close(html_element)) {
-            try self.write_self_closing_tag(html_element, indent);
+        if (html_element.self_closing or self.shouldAutoClose(html_element)) {
+            try self.writeSelfClosingTag(html_element, indent);
             return;
         }
 
-        try self.write_open_tag(html_element, indent);
+        try self.writeOpenTag(html_element, indent);
 
         const new_indent = indent + self.options.tab_width;
 
         for (html_element.children.items) |*child| {
             try self.file_string.indent(new_indent);
-            try self.visit_node(child, new_indent);
+            try self.visitNode(child, new_indent);
         }
 
-        try self.write_closing_tag(html_element, indent);
+        try self.writeClosingTag(html_element, indent);
     }
 
-    fn write_self_closing_tag(self: *Formatter, element: HtmlElement, indent: usize) !void {
+    fn writeSelfClosingTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + element.name.len + 5);
 
         self.file_string.indent_assume_capacity(indent);
@@ -92,7 +93,7 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity("/>\n");
     }
 
-    fn write_open_tag(self: *Formatter, element: HtmlElement, indent: usize) !void {
+    fn writeOpenTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + element.name.len + 4);
 
         self.file_string.indent_assume_capacity(indent);
@@ -101,7 +102,7 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity(">\n");
     }
 
-    fn write_closing_tag(self: *Formatter, element: HtmlElement, indent: usize) !void {
+    fn writeClosingTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + element.name.len + 5);
 
         self.file_string.indent_assume_capacity(indent);
@@ -110,7 +111,7 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity(">\n");
     }
 
-    fn write_comment(self: *Formatter, node: *Node, indent: usize) !void {
+    fn writeComment(self: *Formatter, node: *Node, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + node.comment.len);
 
         self.file_string.indent_assume_capacity(indent);
@@ -119,21 +120,23 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity(" -->");
     }
 
-    fn write_text(self: *Formatter, node: *Node, indent: usize) !void {
+    fn writeText(self: *Formatter, node: *Node, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + node.text.len);
 
         self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity(node.text);
     }
 
-    inline fn should_auto_close(self: *Formatter, html_element: HtmlElement) bool {
+    inline fn shouldAutoClose(self: *Formatter, html_element: HtmlElement) bool {
         return self.options.auto_self_close and html_element.children.items.len == 0 and self.html_elements.get(html_element.name) == true;
     }
 };
 
-fn create_html_elements(allocator: std.mem.Allocator) !std.StringHashMapUnmanaged(bool) {
+fn createHtmlElements(allocator: std.mem.Allocator) StringError!std.StringHashMapUnmanaged(bool) {
     var map = std.StringHashMapUnmanaged(bool){};
-    try map.ensureTotalCapacity(allocator, 108);
+    map.ensureTotalCapacity(allocator, 108) catch {
+        return StringError.OutOfMemory;
+    };
 
     map.putAssumeCapacity("a", true);
     map.putAssumeCapacity("abbr", true);

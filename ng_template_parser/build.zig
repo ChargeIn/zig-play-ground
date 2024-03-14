@@ -15,12 +15,12 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const options_module = b.createModule(.{
+    const options_module = b.addModule("options", .{
         .root_source_file = .{ .path = "./src/options/options.zig" },
         .imports = &.{},
     });
 
-    const utils_module = b.createModule(.{
+    const utils_module = b.addModule("utils", .{
         .root_source_file = .{ .path = "./src/utils/string.zig" },
         .imports = &.{},
     });
@@ -33,10 +33,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    b.addModule("options", options_module);
-    b.addModule("utils", utils_module);
-    b.addModule("template", template_module);
-
     const exe = b.addExecutable(.{
         .name = "html_parser",
         // In this case the main source file is merely a path, however, in more
@@ -45,6 +41,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe.root_module.addImport("ng_template", template_module);
+    exe.root_module.addImport("options", options_module);
+    exe.root_module.addImport("utils", utils_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -81,6 +80,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.root_module.addImport("ng_template", template_module);
+    unit_tests.root_module.addImport("options", options_module);
+    unit_tests.root_module.addImport("utils", utils_module);
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

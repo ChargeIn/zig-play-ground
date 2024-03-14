@@ -113,7 +113,7 @@ const Lexer = struct {
         // skip '<' token
         self.index += 1;
 
-        var char = self.buffer[self.index];
+        const char = self.buffer[self.index];
 
         switch (char) {
             'A'...'Z', 'a'...'z' => {

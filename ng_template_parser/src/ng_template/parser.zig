@@ -16,7 +16,7 @@ const Parser = struct {
     lexer: Lexer,
 
     pub fn init(buffer: [:0]const u8) Parser {
-        var lexer = Lexer.init(buffer);
+        const lexer = Lexer.init(buffer);
         return Parser{ .lexer = lexer };
     }
 
