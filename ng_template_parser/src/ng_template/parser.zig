@@ -70,10 +70,6 @@ const Parser = struct {
             }
         }
 
-        for (elements.items, 0..) |*el, i| {
-            std.debug.print("Element {d}: {any}\n", .{ i, el });
-        }
-
         return elements;
     }
 };

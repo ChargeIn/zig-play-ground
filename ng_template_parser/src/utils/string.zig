@@ -40,7 +40,7 @@ pub const FileString = struct {
     }
 
     pub fn deinit(self: *FileString) void {
-        if (self.buffer) |buffer| self.allocator.free(buffer);
+        self.allocator.free(self.buffer);
     }
 
     pub fn allocate(self: *FileString, bytes: usize) StringError!void {

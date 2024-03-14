@@ -21,11 +21,10 @@ pub fn test_parse_content(content: [:0]const u8, allocator: std.mem.Allocator) !
     var ngTemplateLexer = NgTemplateLexer.init(content);
 
     var t = try ngTemplateLexer.next(allocator);
-    std.debug.print("Parsed Token {any}\n", .{t});
+
     while (t != Token.eof) {
         try token_list.append(t);
         t = try ngTemplateLexer.next(allocator);
-        std.debug.print("Parsed Token {any}\n", .{t});
     }
     return token_list;
 }

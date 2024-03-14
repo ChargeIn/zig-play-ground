@@ -22,14 +22,17 @@ test "should use tabWidth correctly" {
     const content = "<div><div>Hello World</div></div>";
     const expected_content =
         \\<div>
-        \\    <div>Hello World</div>
+        \\    <div>
+        \\        Hello World
+        \\    </div>
         \\</div>
+        \\
     ;
 
     const formatted_content = try formatter.format(content);
 
     expect(std.mem.eql(u8, formatted_content, expected_content)) catch |err| {
-        std.debug.print("Formatted context does not match: \n\n Expected: \n{s}\n\nRecieved:\n{s}\n\n", .{ content, formatted_content });
+        std.debug.print("Formatted context does not match: \n\n Expected: \n{s}\n\nRecieved:\n{s}\n\n", .{ expected_content, formatted_content });
         return err;
     };
 }

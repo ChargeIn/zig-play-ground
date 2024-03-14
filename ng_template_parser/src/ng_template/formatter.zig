@@ -29,6 +29,7 @@ const Formatter = struct {
 
     pub fn deinit(self: *Formatter) void {
         self.html_elements.deinit(self.allocator);
+        self.file_string.deinit();
     }
 
     pub fn format(self: *Formatter, content: [:0]const u8) ![]u8 {
@@ -77,7 +78,6 @@ const Formatter = struct {
         const new_indent = indent + self.options.tab_width;
 
         for (html_element.children.items) |*child| {
-            try self.file_string.indent(new_indent);
             try self.visitNode(child, new_indent);
         }
 
@@ -121,10 +121,11 @@ const Formatter = struct {
     }
 
     fn writeText(self: *Formatter, node: *Node, indent: usize) StringError!void {
-        try self.file_string.ensure_capacity(indent + node.text.len);
+        try self.file_string.ensure_capacity(indent + node.text.len + 1);
 
         self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity(node.text);
+        self.file_string.concat_assume_capacity("\n");
     }
 
     inline fn shouldAutoClose(self: *Formatter, html_element: HtmlElement) bool {
