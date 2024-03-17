@@ -4,7 +4,7 @@
 //
 const std = @import("std");
 const Parser = @import("parser.zig").NgTemplateParser;
-const Options = @import("options").HtmlFormatterOptions;
+const Options = @import("options.zig").NgTemplateFormatterOptions;
 const utils = @import("utils");
 const FileString = utils.FileString;
 const StringError = utils.StringError;
@@ -119,6 +119,8 @@ const Formatter = struct {
     fn writeAttributes(self: *Formatter, node: HtmlElement, indent: usize) StringError!void {
         const attr_indent: usize = indent + self.options.tab_width;
 
+        self.sortAttirbutes(node.attributes);
+
         for (node.attributes.items) |*attr| {
             // ensure max possible combination e.g. two way binding ("[(") and value (=\") + new lines
             // new lines (2 chars) + wrapper around name (4 chars) + equals signs and wrapper quotes (3) + name, value, indent len
@@ -132,6 +134,26 @@ const Formatter = struct {
         if (node.attributes.items.len > 0) {
             try self.file_string.concat("\n");
             try self.file_string.indent(indent);
+        }
+    }
+
+    fn sortAttirbutes(self: *Formatter, attributes: std.ArrayListUnmanaged(HtmlAttribute)) void {
+        if (attributes.items.len == 0) {
+            return;
+        }
+
+        var i: usize = 0;
+
+        for (self.options.attribute_order.items) |order_type| {
+            for (i..attributes.items.len) |j| {
+                if (attributes.items[j].type == order_type) {
+                    // switch the item with the first unsorted item in the list
+                    const item = attributes.items[i];
+                    attributes.items[i] = attributes.items[j];
+                    attributes.items[j] = item;
+                    i += 1;
+                }
+            }
         }
     }
 
