@@ -4,11 +4,14 @@
 //
 const std = @import("std");
 const Parser = @import("parser.zig").NgTemplateParser;
-const Options = @import("options").FormatterOptions;
-const FileString = @import("utils").FileString;
-const StringError = @import("utils").StringError;
-const Node = @import("ast.zig").NgTemplateNode;
-const HtmlElement = @import("ast.zig").HtmlElement;
+const Options = @import("options").HtmlFormatterOptions;
+const utils = @import("utils");
+const FileString = utils.FileString;
+const StringError = utils.StringError;
+const ast = @import("ast.zig");
+const Node = ast.NgTemplateNode;
+const HtmlElement = ast.HtmlElement;
+const HtmlAttribute = ast.HtmlAttribute;
 
 pub const NgTemplateFormatter = Formatter;
 
@@ -90,6 +93,7 @@ const Formatter = struct {
         self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity("<");
         self.file_string.concat_assume_capacity(element.name);
+        try self.writeAttributes(element, indent);
         self.file_string.concat_assume_capacity("/>\n");
     }
 
@@ -99,6 +103,7 @@ const Formatter = struct {
         self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity("<");
         self.file_string.concat_assume_capacity(element.name);
+        try self.writeAttributes(element, indent);
         self.file_string.concat_assume_capacity(">\n");
     }
 
@@ -109,6 +114,55 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity("</");
         self.file_string.concat_assume_capacity(element.name);
         self.file_string.concat_assume_capacity(">\n");
+    }
+
+    fn writeAttributes(self: *Formatter, node: HtmlElement, indent: usize) StringError!void {
+        const attr_indent: usize = indent + self.options.tab_width;
+
+        for (node.attributes.items) |*attr| {
+            // ensure max possible combination e.g. two way binding ("[(") and value (=\") + new lines
+            // new lines (2 chars) + wrapper around name (4 chars) + equals signs and wrapper quotes (3) + name, value, indent len
+            try self.file_string.ensure_capacity(attr_indent + 9 + attr.name.len + attr.value.len);
+
+            self.file_string.concat_assume_capacity("\n");
+            self.file_string.indent_assume_capacity(attr_indent);
+            self.writeAttribute(attr);
+        }
+
+        if (node.attributes.items.len > 0) {
+            try self.file_string.concat("\n");
+            try self.file_string.indent(indent);
+        }
+    }
+
+    fn writeAttribute(self: *Formatter, attr: *HtmlAttribute) void {
+        // we already assumed capacity in the write attributes function
+        switch (attr.type) {
+            .static => {
+                self.file_string.concat_assume_capacity(attr.name);
+            },
+            .one_way => {
+                self.file_string.concat_assume_capacity("[");
+                self.file_string.concat_assume_capacity(attr.name);
+                self.file_string.concat_assume_capacity("]");
+            },
+            .two_way => {
+                self.file_string.concat_assume_capacity("[(");
+                self.file_string.concat_assume_capacity(attr.name);
+                self.file_string.concat_assume_capacity(")]");
+            },
+            .output => {
+                self.file_string.concat_assume_capacity("(");
+                self.file_string.concat_assume_capacity(attr.name);
+                self.file_string.concat_assume_capacity(")");
+            },
+        }
+
+        if (attr.has_value) {
+            self.file_string.concat_assume_capacity("=\"");
+            self.file_string.concat_assume_capacity(attr.value);
+            self.file_string.concat_assume_capacity("\"");
+        }
     }
 
     fn writeComment(self: *Formatter, node: *Node, indent: usize) StringError!void {
