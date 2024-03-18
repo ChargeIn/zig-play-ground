@@ -10,15 +10,50 @@ const Options = @import("ng_template").NgTemplateFormatterOptions;
 const expectEqual = std.testing.expectEqual;
 const expect = std.testing.expect;
 
+fn testFormatContent(content: [:0]const u8, expected_content: [:0]const u8, options: Options) !void {
+    const allocator = std.testing.allocator;
+
+    var formatter = try Formatter.init(allocator, options);
+    defer formatter.deinit();
+
+    const formatted_content = try formatter.format(content);
+
+    expect(std.mem.eql(u8, formatted_content, expected_content)) catch |err| {
+        std.debug.print("Formatted context does not match: \n\n Expected: \n{s}\n\nRecieved:\n{s}", .{ expected_content, formatted_content });
+
+        for (0..expected_content.len) |i| {
+            if (expected_content[i] != formatted_content[i]) {
+                std.debug.print("Char at index {d} does not match: \nExpected: {c}\nRecieved: {c}\n\n", .{ i, expected_content[i], formatted_content[i] });
+            }
+        }
+
+        return err;
+    };
+}
+
+test "should trim text content" {
+    const allocator = std.testing.allocator;
+
+    var options = try Options.init(allocator);
+    defer options.deinit();
+
+    const content = "<div> \n\t      Hello      World     \n\t  </div>";
+    const expected_content =
+        \\<div>
+        \\    Hello      World
+        \\</div>
+        \\
+    ;
+
+    try testFormatContent(content, expected_content, options);
+}
+
 test "should use tabWidth correctly" {
     const allocator = std.testing.allocator;
 
     var options = try Options.init(allocator);
     defer options.deinit();
     options.tab_width = 5;
-
-    var formatter = try Formatter.init(allocator, options);
-    defer formatter.deinit();
 
     const content = "<div><div>Hello World</div></div>";
     const expected_content =
@@ -30,12 +65,7 @@ test "should use tabWidth correctly" {
         \\
     ;
 
-    const formatted_content = try formatter.format(content);
-
-    expect(std.mem.eql(u8, formatted_content, expected_content)) catch |err| {
-        std.debug.print("Formatted context does not match: \n\n Expected: \n{s}\n\nRecieved:\n{s}\n\n", .{ expected_content, formatted_content });
-        return err;
-    };
+    try testFormatContent(content, expected_content, options);
 }
 
 test "should format attributes correctly" {
@@ -45,9 +75,6 @@ test "should format attributes correctly" {
     defer options.deinit();
 
     options.tab_width = 5;
-
-    var formatter = try Formatter.init(allocator, options);
-    defer formatter.deinit();
 
     const content = "<div><custom-component [input1]=\"SomeValue1\" *ngIf=\"SomeCheckValue\" (output1)=\"onEvent1($event)\" directive staticInput=\"Some Value\">Hello World</custom-component></div>";
     const expected_content =
@@ -64,18 +91,5 @@ test "should format attributes correctly" {
         \\</div>
         \\
     ;
-
-    const formatted_content = try formatter.format(content);
-
-    expect(std.mem.eql(u8, formatted_content, expected_content)) catch |err| {
-        std.debug.print("Formatted context does not match: \n\n Expected: \n{s}\n\nRecieved:\n{s}", .{ expected_content, formatted_content });
-
-        for (0..expected_content.len) |i| {
-            if (expected_content[i] != formatted_content[i]) {
-                std.debug.print("Char at index {d} does not match: \nExpected: {c}\nRecieved: {c}\n\n", .{ i, expected_content[i], formatted_content[i] });
-            }
-        }
-
-        return err;
-    };
+    try testFormatContent(content, expected_content, options);
 }

@@ -123,7 +123,7 @@ test "div" {
     };
 
     const text1 = Node{ .text = "Hello" };
-    const text2 = Node{ .text = " World" };
+    const text2 = Node{ .text = "World" };
 
     var thirdDiv = HtmlElement{
         .name = "custom",
