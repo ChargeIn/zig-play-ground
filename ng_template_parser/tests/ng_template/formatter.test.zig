@@ -24,6 +24,7 @@ fn testFormatContent(content: [:0]const u8, expected_content: [:0]const u8, opti
         for (0..expected_content.len) |i| {
             if (expected_content[i] != formatted_content[i]) {
                 std.debug.print("Char at index {d} does not match: \nExpected: {c}\nRecieved: {c}\n\n", .{ i, expected_content[i], formatted_content[i] });
+                break;
             }
         }
 
@@ -92,4 +93,61 @@ test "should format attributes correctly" {
         \\
     ;
     try testFormatContent(content, expected_content, options);
+}
+
+test "should not self close html elements" {
+    const allocator = std.testing.allocator;
+
+    var options = try Options.init(allocator);
+    defer options.deinit();
+
+    const content =
+        \\<div></div>
+        \\<span></span>
+        \\<h1></h1>
+        \\<h2></h2>
+        \\<h3></h3>
+        \\<h4></h4>
+        \\<h5></h5>
+        \\<h6></h6>
+        \\<a></a>
+        \\<table></table>
+        \\<li></li>
+        \\
+    ;
+    const expected_content =
+        \\<div></div>
+        \\<span></span>
+        \\<h1></h1>
+        \\<h2></h2>
+        \\<h3></h3>
+        \\<h4></h4>
+        \\<h5></h5>
+        \\<h6></h6>
+        \\<a></a>
+        \\<table></table>
+        \\<li></li>
+        \\
+    ;
+    try testFormatContent(content, expected_content, options);
+}
+
+test "should add new line between two children" {
+    // const allocator = std.testing.allocator;
+    //
+    // var options = try Options.init(allocator);
+    // defer options.deinit();
+    //
+    // const content = "<div><div></div><div></div><div></div></div>";
+    // const expected_content =
+    //     \\<div>
+    //     \\    <div></div>
+    //     \\
+    //     \\    <div></div>
+    //     \\
+    //     \\    <div></div>
+    //     \\</div>
+    //     \\
+    // ;
+    // try testFormatContent(content, expected_content, options);
 }

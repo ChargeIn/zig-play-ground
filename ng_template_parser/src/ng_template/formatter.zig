@@ -104,7 +104,11 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity("<");
         self.file_string.concat_assume_capacity(element.name);
         try self.writeAttributes(element, indent);
-        self.file_string.concat_assume_capacity(">\n");
+        self.file_string.concat_assume_capacity(">");
+
+        if (element.children.items.len > 0) {
+            self.file_string.concat_assume_capacity("\n");
+        }
     }
 
     fn writeClosingTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
@@ -205,7 +209,7 @@ const Formatter = struct {
     }
 
     inline fn shouldAutoClose(self: *Formatter, html_element: HtmlElement) bool {
-        return self.options.auto_self_close and html_element.children.items.len == 0 and self.html_elements.get(html_element.name) == true;
+        return self.options.auto_self_close and html_element.children.items.len == 0 and self.html_elements.get(html_element.name) != true;
     }
 };
 
@@ -255,6 +259,11 @@ fn createHtmlElements(allocator: std.mem.Allocator) StringError!std.StringHashMa
     map.putAssumeCapacity("footer", true);
     map.putAssumeCapacity("form", true);
     map.putAssumeCapacity("h1", true);
+    map.putAssumeCapacity("h2", true);
+    map.putAssumeCapacity("h3", true);
+    map.putAssumeCapacity("h4", true);
+    map.putAssumeCapacity("h5", true);
+    map.putAssumeCapacity("h6", true);
     map.putAssumeCapacity("head", true);
     map.putAssumeCapacity("header", true);
     map.putAssumeCapacity("hgroup", true);

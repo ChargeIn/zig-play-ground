@@ -108,7 +108,7 @@ const Lexer = struct {
         }
 
         const start = self.index;
-        var end = start;
+        var end = self.index;
 
         while (char != '<' and char != 0) {
             // save last non white space index for trimming
@@ -119,7 +119,13 @@ const Lexer = struct {
             self.index += 1;
             char = self.buffer[self.index];
         }
-        return Token{ .text = self.buffer[start..(end + 1)] };
+
+        // only if there are only white space characters keep it empty
+        if (end != start) {
+            end += 1;
+        }
+
+        return Token{ .text = self.buffer[start..end] };
     }
 
     fn parseTag(self: *Lexer, allocator: std.mem.Allocator) !Token {

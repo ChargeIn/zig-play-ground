@@ -62,7 +62,10 @@ const Parser = struct {
                     try elements.append(allocator, Node{ .cdata = token.cdata });
                 },
                 .text => {
-                    try elements.append(allocator, Node{ .text = token.text });
+                    // ignore text that are empty (only contained white spaces)
+                    if (token.text.len != 0) {
+                        try elements.append(allocator, Node{ .text = token.text });
+                    }
                 },
                 .eof => {
                     try elements.append(allocator, Node.eof);
