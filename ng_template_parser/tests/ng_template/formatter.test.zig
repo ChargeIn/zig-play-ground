@@ -28,6 +28,8 @@ fn testFormatContent(content: [:0]const u8, expected_content: [:0]const u8, opti
             }
         }
 
+        try expectEqual(formatted_content.len, expected_content.len);
+
         return err;
     };
 }
@@ -77,7 +79,7 @@ test "should format attributes correctly" {
 
     options.tab_width = 5;
 
-    const content = "<div><custom-component [input1]=\"SomeValue1\" *ngIf=\"SomeCheckValue\" (output1)=\"onEvent1($event)\" directive staticInput=\"Some Value\">Hello World</custom-component></div>";
+    const content = "<div><custom-component [input1]=\"SomeValue1\" *ngIf=\"SomeCheckValue\" (output1)=\"onEvent1($event)\" directive staticInput=\"Some Value\">Hello World</custom-component>\n \n       </div>";
     const expected_content =
         \\<div>
         \\     <custom-component
@@ -105,13 +107,17 @@ test "should not alter content of pre tags" {
         \\<pre> laksdf
         \\ dddf
         \\      dsf
+        \\
         \\</pre>
+        \\
+        \\
         \\
     ;
     const expected_content =
         \\<pre> laksdf
         \\ dddf
         \\      dsf
+        \\
         \\</pre>
         \\
     ;
@@ -140,15 +146,25 @@ test "should not self close html elements" {
     ;
     const expected_content =
         \\<div></div>
+        \\
         \\<span></span>
+        \\
         \\<h1></h1>
+        \\
         \\<h2></h2>
+        \\
         \\<h3></h3>
+        \\
         \\<h4></h4>
+        \\
         \\<h5></h5>
+        \\
         \\<h6></h6>
+        \\
         \\<a></a>
+        \\
         \\<table></table>
+        \\
         \\<li></li>
         \\
     ;

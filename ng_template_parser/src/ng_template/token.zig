@@ -95,7 +95,7 @@ pub const TextTag = struct {
 
     pub fn format(value: TextTag, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print(
-            "TextTag {{ raw: {s}, trimmed: {any}",
+            "TextTag {{ raw: {s}, trimmed: {s}",
             .{ value.raw, value.trimmed },
         );
     }

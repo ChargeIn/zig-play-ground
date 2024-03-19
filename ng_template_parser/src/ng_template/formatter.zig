@@ -46,78 +46,103 @@ const Formatter = struct {
             item.deinit(self.allocator);
         };
 
-        for (elements.items) |*element| {
-            try self.visitNode(element, 0);
+        const lastEl = findLastElementWithContent(&elements);
+
+        for (elements.items, 0..) |*element, i| {
+            try self.visitNode(element, 0, true, i != lastEl);
         }
 
         return self.file_string.toString();
     }
 
-    fn visitNode(self: *Formatter, element: *Node, indent: usize) StringError!void {
+    fn visitNode(self: *Formatter, element: *Node, indent: usize, whitespace_insensitiv: bool, not_last: bool) StringError!void {
         switch (element.*) {
             .html_element => {
-                try self.writeHtmlElement(element.html_element, indent);
+                try self.writeHtmlElement(element.html_element, indent, whitespace_insensitiv, not_last);
             },
             .comment => {
                 try self.writeComment(element, indent);
             },
             .text => {
-                try self.writeText(element, indent);
+                try self.writeText(element, indent, whitespace_insensitiv);
             },
             else => {},
         }
     }
 
-    fn writeHtmlElement(self: *Formatter, html_element: HtmlElement, indent: usize) StringError!void {
+    fn writeHtmlElement(self: *Formatter, html_element: HtmlElement, indent: usize, whitespace_insensitiv: bool, not_last: bool) StringError!void {
+        const content_whitespace_insenstive = whitespace_insensitiv and !std.mem.eql(u8, html_element.name, "pre");
+
+        if (whitespace_insensitiv) {
+            try self.file_string.indent(indent);
+        }
 
         // check if self closing or auto closing
         if (html_element.self_closing or self.shouldAutoClose(html_element)) {
             try self.writeSelfClosingTag(html_element, indent);
+
+            if (content_whitespace_insenstive) {
+                try self.file_string.concat("\n");
+            }
             return;
         }
 
         try self.writeOpenTag(html_element, indent);
 
-        const new_indent = indent + self.options.tab_width;
-
-        for (html_element.children.items) |*child| {
-            try self.visitNode(child, new_indent);
+        if (html_element.children.items.len > 0 and content_whitespace_insenstive) {
+            self.file_string.concat_assume_capacity("\n");
         }
 
+        const new_indent = indent + self.options.tab_width;
+
+        if (html_element.children.items.len > 0) {
+
+            // find last child with content
+            const lastChild = findLastElementWithContent(&html_element.children);
+
+            for (html_element.children.items, 0..) |*child, i| {
+                try self.visitNode(child, new_indent, content_whitespace_insenstive, i != lastChild);
+            }
+        }
+
+        if (content_whitespace_insenstive) {
+            try self.file_string.indent(indent);
+        }
         try self.writeClosingTag(html_element, indent);
+
+        if (whitespace_insensitiv) {
+            try self.file_string.concat("\n");
+
+            if (not_last) {
+                try self.file_string.concat("\n");
+            }
+        }
     }
 
     fn writeSelfClosingTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
-        try self.file_string.ensure_capacity(indent + element.name.len + 5);
+        try self.file_string.ensure_capacity(element.name.len + 3);
 
-        self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity("<");
         self.file_string.concat_assume_capacity(element.name);
         try self.writeAttributes(element, indent);
-        self.file_string.concat_assume_capacity("/>\n");
+        self.file_string.concat_assume_capacity("/>");
     }
 
     fn writeOpenTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + element.name.len + 4);
 
-        self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity("<");
         self.file_string.concat_assume_capacity(element.name);
         try self.writeAttributes(element, indent);
         self.file_string.concat_assume_capacity(">");
-
-        if (element.children.items.len > 0) {
-            self.file_string.concat_assume_capacity("\n");
-        }
     }
 
     fn writeClosingTag(self: *Formatter, element: HtmlElement, indent: usize) StringError!void {
         try self.file_string.ensure_capacity(indent + element.name.len + 5);
 
-        self.file_string.indent_assume_capacity(indent);
         self.file_string.concat_assume_capacity("</");
         self.file_string.concat_assume_capacity(element.name);
-        self.file_string.concat_assume_capacity(">\n");
+        self.file_string.concat_assume_capacity(">");
     }
 
     fn writeAttributes(self: *Formatter, node: HtmlElement, indent: usize) StringError!void {
@@ -200,12 +225,18 @@ const Formatter = struct {
         self.file_string.concat_assume_capacity(" -->");
     }
 
-    fn writeText(self: *Formatter, node: *Node, indent: usize) StringError!void {
-        try self.file_string.ensure_capacity(indent + node.text.len + 1);
+    fn writeText(self: *Formatter, node: *Node, indent: usize, whitespace_insensitiv: bool) StringError!void {
+        try self.file_string.ensure_capacity(indent + node.text.raw.len + 1);
 
-        self.file_string.indent_assume_capacity(indent);
-        self.file_string.concat_assume_capacity(node.text);
-        self.file_string.concat_assume_capacity("\n");
+        if (whitespace_insensitiv) {
+            if (node.text.trimmed.len > 0) {
+                self.file_string.indent_assume_capacity(indent);
+                self.file_string.concat_assume_capacity(node.text.trimmed);
+                self.file_string.concat_assume_capacity("\n");
+            }
+        } else {
+            self.file_string.concat_assume_capacity(node.text.raw);
+        }
     }
 
     inline fn shouldAutoClose(self: *Formatter, html_element: HtmlElement) bool {
@@ -334,4 +365,26 @@ fn createHtmlElements(allocator: std.mem.Allocator) StringError!std.StringHashMa
     map.putAssumeCapacity("video", true);
     map.putAssumeCapacity("wbr", true);
     return map;
+}
+
+fn findLastElementWithContent(list: *const std.ArrayListUnmanaged(Node)) usize {
+    // return index outsize of scope if nothing found
+    var lastEl = list.items.len;
+    var j = list.items.len - 1;
+
+    while (j > -1) : (j -= 1) {
+        switch (list.items[j]) {
+            .text => |v| {
+                if (v.trimmed.len > 0) {
+                    lastEl = j;
+                    break;
+                }
+            },
+            else => {
+                lastEl = j;
+                break;
+            },
+        }
+    }
+    return lastEl;
 }
