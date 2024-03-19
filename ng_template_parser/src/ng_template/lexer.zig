@@ -5,6 +5,7 @@
 const std = @import("std");
 const tokens = @import("token.zig");
 const Token = tokens.NgTemplateToken;
+const TextTag = tokens.TextTag;
 
 // For a good referenz see https://github.com/ziglang/zig/blob/master/lib/std/zig/tokenizer.zig
 
@@ -101,6 +102,8 @@ const Lexer = struct {
     fn parseText(self: *Lexer) Token {
         var char = self.buffer[self.index];
 
+        const rawStart = self.index;
+
         // trim starting whitespaces
         while (isWhiteSpace(char)) {
             self.index += 1;
@@ -125,7 +128,7 @@ const Lexer = struct {
             end += 1;
         }
 
-        return Token{ .text = self.buffer[start..end] };
+        return .{ .text = TextTag.init(self.buffer[rawStart..self.index], self.buffer[start..end]) };
     }
 
     fn parseTag(self: *Lexer, allocator: std.mem.Allocator) !Token {
@@ -211,7 +214,7 @@ const Lexer = struct {
                     }
                     self.index += 1;
 
-                    return Token{ .comment = self.buffer[start..(self.index - 3)] };
+                    return .{ .comment = self.buffer[start..(self.index - 3)] };
                 },
                 0 => {
                     return NgTemplateLexerErrors.EofInComment;
@@ -276,7 +279,7 @@ const Lexer = struct {
             return NgTemplateLexerErrors.EofInDoctype;
         }
 
-        return Token{ .doc_type = self.buffer[start..(self.index - 1)] };
+        return .{ .doc_type = self.buffer[start..(self.index - 1)] };
     }
 
     fn parseCData(self: *Lexer) !Token {
@@ -350,7 +353,7 @@ const Lexer = struct {
                     }
                     self.index += 1;
 
-                    return Token{ .cdata = self.buffer[start..(self.index - 3)] };
+                    return .{ .cdata = self.buffer[start..(self.index - 3)] };
                 },
                 else => {},
             }
@@ -376,7 +379,7 @@ const Lexer = struct {
         }
         self.index += 1;
 
-        return Token{ .start_tag = tokens.StartTag.init(name, self_closing, attributes) };
+        return .{ .start_tag = tokens.StartTag.init(name, self_closing, attributes) };
     }
 
     fn parseClosingTag(self: *Lexer) !Token {
@@ -393,7 +396,7 @@ const Lexer = struct {
                 },
                 '>' => {
                     self.index += 1;
-                    return Token{ .end_tag = tokens.EndTag.init(name) };
+                    return .{ .end_tag = tokens.EndTag.init(name) };
                 },
                 0 => {
                     return NgTemplateLexerErrors.EofInTag;

@@ -5,6 +5,22 @@
 const std = @import("std");
 const Attribute = @import("token.zig").Attribute;
 
+pub const HtmlTextElement = struct {
+    raw: []const u8,
+    trimmed: []const u8,
+
+    pub fn format(value: HtmlTextElement, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "HtmlTextElement {{ raw: {s}, trimmed: {any}",
+            .{ value.raw, value.trimmed },
+        );
+    }
+
+    pub fn init(raw: []const u8, trimmed: []const u8) HtmlTextElement {
+        return .{ .trimmed = trimmed, .raw = raw };
+    }
+};
+
 pub const HtmlElement = struct {
     name: []const u8,
     self_closing: bool,
@@ -111,14 +127,14 @@ pub const NgTemplateNode = union(enum) {
     doc_type: []const u8,
     cdata: []const u8,
     comment: []const u8,
-    text: []const u8,
+    text: HtmlTextElement,
     eof,
 
     pub fn format(value: NgTemplateNode, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {
         switch (value) {
             .html_element => |v| try v.format(fmt, opt, writer),
             .comment => |v| try writer.print("Comment {{ \"{s}\" }}", .{v}),
-            .text => |v| try writer.print("Text {{ \"{s}\" }}", .{v}),
+            .text => |v| try v.format(fmt, opt, writer),
             .cdata => |v| try writer.print("RcData {{ \"{s}\" }}", .{v}),
             .doc_type => |v| try writer.print("DocType {{ \"{s}\" }}", .{v}),
             .eof => try writer.print("End of File", .{}),

@@ -83,7 +83,12 @@ fn test_equal_nodes(n1: Node, n2: Node) !void {
             };
         }
     } else if (n1 == .text and n2 == .text) {
-        expect(std.mem.eql(u8, n1.text, n2.text)) catch |err| {
+        expect(std.mem.eql(u8, n1.text.raw, n2.text.raw)) catch |err| {
+            std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
+            return err;
+        };
+
+        expect(std.mem.eql(u8, n1.text.trimmed, n2.text.trimmed)) catch |err| {
             std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ n1, n2 });
             return err;
         };
@@ -99,7 +104,7 @@ test "rawtext" {
     const content: [:0]const u8 = "Some random html text.";
 
     const nodes = [_]Node{
-        Node{ .text = "Some random html text." },
+        .{ .text = .{ .raw = "Some random html text.", .trimmed = "Some random html text." } },
     };
 
     try test_equals(content, &nodes);
@@ -122,8 +127,8 @@ test "div" {
         .children = std.ArrayListUnmanaged(Node){},
     };
 
-    const text1 = Node{ .text = "Hello" };
-    const text2 = Node{ .text = "World" };
+    const text1 = Node{ .text = .{ .raw = "Hello", .trimmed = "Hello" } };
+    const text2 = Node{ .text = .{ .raw = " World", .trimmed = "World" } };
 
     var thirdDiv = HtmlElement{
         .name = "custom",

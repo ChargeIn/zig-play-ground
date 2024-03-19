@@ -53,19 +53,22 @@ const Parser = struct {
                     return elements;
                 },
                 .comment => {
-                    try elements.append(allocator, Node{ .doc_type = token.comment });
+                    try elements.append(allocator, .{ .doc_type = token.comment });
                 },
                 .doc_type => {
-                    try elements.append(allocator, Node{ .doc_type = token.doc_type });
+                    try elements.append(allocator, .{ .doc_type = token.doc_type });
                 },
                 .cdata => {
-                    try elements.append(allocator, Node{ .cdata = token.cdata });
+                    try elements.append(allocator, .{ .cdata = token.cdata });
                 },
                 .text => {
-                    // ignore text that are empty (only contained white spaces)
-                    if (token.text.len != 0) {
-                        try elements.append(allocator, Node{ .text = token.text });
-                    }
+                    // ignore text that are empty
+                    try elements.append(allocator, .{
+                        .text = .{
+                            .raw = token.text.raw,
+                            .trimmed = token.text.trimmed,
+                        },
+                    });
                 },
                 .eof => {
                     try elements.append(allocator, Node.eof);

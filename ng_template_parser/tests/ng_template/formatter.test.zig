@@ -95,6 +95,29 @@ test "should format attributes correctly" {
     try testFormatContent(content, expected_content, options);
 }
 
+test "should not alter content of pre tags" {
+    const allocator = std.testing.allocator;
+
+    var options = try Options.init(allocator);
+    defer options.deinit();
+
+    const content =
+        \\<pre> laksdf
+        \\ dddf
+        \\      dsf
+        \\</pre>
+        \\
+    ;
+    const expected_content =
+        \\<pre> laksdf
+        \\ dddf
+        \\      dsf
+        \\</pre>
+        \\
+    ;
+    try testFormatContent(content, expected_content, options);
+}
+
 test "should not self close html elements" {
     const allocator = std.testing.allocator;
 

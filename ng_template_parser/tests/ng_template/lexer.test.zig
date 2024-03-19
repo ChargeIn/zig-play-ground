@@ -83,7 +83,12 @@ pub fn test_equal_tokens(t1: Token, t2: Token) !void {
             };
         }
     } else if (t1 == .text and t2 == .text) {
-        expect(std.mem.eql(u8, t1.text, t2.text)) catch |err| {
+        expect(std.mem.eql(u8, t1.text.raw, t2.text.raw)) catch |err| {
+            std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ t1, t2 });
+            return err;
+        };
+
+        expect(std.mem.eql(u8, t1.text.trimmed, t2.text.trimmed)) catch |err| {
             std.debug.print("Error: Expected '{any}' recieved '{any}'\n", .{ t1, t2 });
             return err;
         };
@@ -128,8 +133,8 @@ pub fn readFile(path: []const u8, allocator: std.mem.Allocator) ![:0]u8 {
 //                      TESTING
 // ----------------------------------------------------------------
 test "rawtext" {
-    const content: [:0]const u8 = "Some random html text.";
-    const expected = [_]Token{Token{ .text = "Some random html text." }};
+    const content: [:0]const u8 = "Some random html text. ";
+    const expected = [_]Token{.{ .text = .{ .raw = "Some random html text. ", .trimmed = "Some random html text." } }};
 
     try test_tokenizer(content, &expected);
 }
@@ -138,7 +143,7 @@ test "simple div tag" {
     const content: [:0]const u8 = "<div>Hello World</div>";
     const expected = [_]Token{
         Token{ .start_tag = StartTag.init("div", false, .{}) },
-        Token{ .text = "Hello World" },
+        Token{ .text = .{ .raw = "Hello World", .trimmed = "Hello World" } },
         Token{ .end_tag = EndTag.init("div") },
     };
 
@@ -147,7 +152,7 @@ test "simple div tag" {
 
 test "self closing tags" {
     const content: [:0]const u8 = "<div/>";
-    const expected = [_]Token{Token{ .start_tag = StartTag.init("div", true, .{}) }};
+    const expected = [_]Token{.{ .start_tag = StartTag.init("div", true, .{}) }};
 
     try test_tokenizer(content, &expected);
 }

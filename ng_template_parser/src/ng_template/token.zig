@@ -89,19 +89,35 @@ pub const EndTag = struct {
     }
 };
 
+pub const TextTag = struct {
+    raw: []const u8,
+    trimmed: []const u8,
+
+    pub fn format(value: TextTag, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "TextTag {{ raw: {s}, trimmed: {any}",
+            .{ value.raw, value.trimmed },
+        );
+    }
+
+    pub fn init(raw: []const u8, trimmed: []const u8) TextTag {
+        return .{ .trimmed = trimmed, .raw = raw };
+    }
+};
+
 pub const NgTemplateToken = union(enum) {
     start_tag: StartTag,
     end_tag: EndTag,
     doc_type: []const u8,
     cdata: []const u8,
     comment: []const u8,
-    text: []const u8,
+    text: TextTag,
     eof,
 
     pub fn format(value: NgTemplateToken, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {
         switch (value) {
             .comment => |v| try writer.print("Comment {{ \"{s}\" }}", .{v}),
-            .text => |v| try writer.print("Text {{ \"{s}\" }}", .{v}),
+            .text => |v| try v.format(fmt, opt, writer),
             .cdata => |v| try writer.print("RcData {{ \"{s}\" }}", .{v}),
             .doc_type => |v| try writer.print("DocType {{ \"{s}\" }}", .{v}),
             .eof => try writer.print("End of File", .{}),
