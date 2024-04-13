@@ -172,21 +172,21 @@ test "should not self close html elements" {
 }
 
 test "should add new line between two children" {
-    // const allocator = std.testing.allocator;
-    //
-    // var options = try Options.init(allocator);
-    // defer options.deinit();
-    //
-    // const content = "<div><div></div><div></div><div></div></div>";
-    // const expected_content =
-    //     \\<div>
-    //     \\    <div></div>
-    //     \\
-    //     \\    <div></div>
-    //     \\
-    //     \\    <div></div>
-    //     \\</div>
-    //     \\
-    // ;
-    // try testFormatContent(content, expected_content, options);
+    const allocator = std.testing.allocator;
+
+    var options = try Options.init(allocator);
+    defer options.deinit();
+
+    const content = "<div><div></div><div>  </div><div>     </div></div>";
+    const expected_content =
+        \\<div>
+        \\    <div></div>
+        \\
+        \\    <div></div>
+        \\
+        \\    <div></div>
+        \\</div>
+        \\
+    ;
+    try testFormatContent(content, expected_content, options);
 }

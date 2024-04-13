@@ -89,25 +89,27 @@ const Formatter = struct {
 
         try self.writeOpenTag(html_element, indent);
 
-        if (html_element.children.items.len > 0 and content_whitespace_insenstive) {
-            self.file_string.concat_assume_capacity("\n");
-        }
-
         const new_indent = indent + self.options.tab_width;
 
         if (html_element.children.items.len > 0) {
-
             // find last child with content
-            const lastChild = findLastElementWithContent(&html_element.children);
+            const last_child = findLastElementWithContent(&html_element.children);
+
+            const has_non_empty_child = last_child != html_element.children.items.len;
+
+            if (content_whitespace_insenstive and has_non_empty_child) {
+                self.file_string.concat_assume_capacity("\n");
+            }
 
             for (html_element.children.items, 0..) |*child, i| {
-                try self.visitNode(child, new_indent, content_whitespace_insenstive, i != lastChild);
+                try self.visitNode(child, new_indent, content_whitespace_insenstive, i != last_child);
+            }
+
+            if (content_whitespace_insenstive and has_non_empty_child) {
+                try self.file_string.indent(indent);
             }
         }
 
-        if (content_whitespace_insenstive) {
-            try self.file_string.indent(indent);
-        }
         try self.writeClosingTag(html_element, indent);
 
         if (whitespace_insensitiv) {
@@ -370,9 +372,11 @@ fn createHtmlElements(allocator: std.mem.Allocator) StringError!std.StringHashMa
 fn findLastElementWithContent(list: *const std.ArrayListUnmanaged(Node)) usize {
     // return index outsize of scope if nothing found
     var lastEl = list.items.len;
-    var j = list.items.len - 1;
+    var j = list.items.len;
 
-    while (j > -1) : (j -= 1) {
+    while (j > 0) {
+        j -= 1;
+
         switch (list.items[j]) {
             .text => |v| {
                 if (v.trimmed.len > 0) {

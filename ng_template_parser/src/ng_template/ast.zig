@@ -11,7 +11,7 @@ pub const HtmlTextElement = struct {
 
     pub fn format(value: HtmlTextElement, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print(
-            "HtmlTextElement {{ raw: \"{s}\", trimmed: \"{s}\"",
+            "HtmlTextElement {{ raw: \"{s}\", trimmed: \"{s}\" }}",
             .{ value.raw, value.trimmed },
         );
     }
