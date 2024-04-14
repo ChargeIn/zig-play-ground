@@ -95,7 +95,7 @@ pub const TextTag = struct {
 
     pub fn format(value: TextTag, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print(
-            "TextTag {{ raw: {s}, trimmed: {s}",
+            "TextTag {{ raw: \"{s}\", trimmed: \"{s}\" }}",
             .{ value.raw, value.trimmed },
         );
     }
@@ -105,13 +105,32 @@ pub const TextTag = struct {
     }
 };
 
+pub const NgControlElement = struct {
+    name: []const u8,
+    condition: []const u8,
+
+    pub fn format(value: NgControlElement, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "NgControlElement {{ type: {s}, condition: \"{s}\" }}",
+            .{ value.name, value.condition },
+        );
+    }
+
+    pub fn init(name: []const u8, condition: []const u8) NgControlElement {
+        return .{ .name = name, .condition = condition };
+    }
+};
+
 pub const NgTemplateToken = union(enum) {
+    // html elements
     start_tag: StartTag,
     end_tag: EndTag,
     doc_type: []const u8,
     cdata: []const u8,
     comment: []const u8,
     text: TextTag,
+    // ng control flow
+    ng_control_elment: NgControlElement,
     eof,
 
     pub fn format(value: NgTemplateToken, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {

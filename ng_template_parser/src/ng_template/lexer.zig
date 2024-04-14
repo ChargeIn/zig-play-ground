@@ -67,6 +67,8 @@ const NgTemplateLexerErrors = error{
     UnexpectedSolidusInTag,
     UnknownNamedCharacterReference,
     UnsupportedTokenException,
+    UnsupportedNgControlElement,
+    EofInNgControlElement,
 };
 
 const Lexer = struct {
@@ -87,6 +89,9 @@ const Lexer = struct {
         const char = self.buffer[self.index];
 
         switch (char) {
+            '@' => {
+                return self.parseNgControlElement(allocator);
+            },
             '<' => {
                 return self.parseTag(allocator);
             },
@@ -613,6 +618,46 @@ const Lexer = struct {
                 },
                 else => {},
             }
+        }
+    }
+
+    fn parseNgControlElement(self: *Lexer) !Token {
+        // skip '@' char
+        self.index += 1;
+
+        const start = self.index;
+
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (char) {
+                0 => {
+                    return NgTemplateLexerErrors.EofInNgControlElement;
+                },
+                '(' => {
+                    const name = self.buffer[start..self.index];
+                    const condition = try self.parseNgControlCondition();
+                    return tokens.NgControlElement.init(name, condition);
+                },
+                TAB, LINE_FEED, FORM_FEED, SPACE => {
+                    return tokens.NgControlElement.init(self.buffer[start..self.index], "");
+                },
+                '"', '\'', '`', '<', '=' => {
+                    return NgTemplateLexerErrors.UnexpectedCharacterInUnquotedAttributeValue;
+                },
+                else => {},
+            }
+        }
+    }
+
+    fn parseNgControlCondition(self: *Lexer) ![]const u8 {
+        // skip opening brackets
+        self.index += 1;
+
+        while (true) : (self.index += 1) {
+            const char = self.buffer[self.index];
+
+            switch (char) {}
         }
     }
 };

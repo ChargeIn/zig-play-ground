@@ -214,7 +214,7 @@ test "cdata" {
     try test_tokenizer(content, &expected);
 }
 
-test "parse all elements" {
+test "parse all default html elements" {
     const allocator = std.testing.allocator;
 
     const content: [:0]u8 = readFile("tests/ng_template/data/all-no-media-elements.html", allocator) catch |err| {
@@ -230,4 +230,12 @@ test "parse all elements" {
     }
 
     defer token_list.deinit();
+}
+
+// ----------------------- new ng control flow -------------------------
+test "ng if" {
+    const content: [:0]const u8 = "@if(a > b) { } ";
+    const expected = [_]Token{Token{ .cdata = "<div>-!#&8--!<!-->ds]] .!<\"§$%&/(" }};
+
+    try test_tokenizer(content, &expected);
 }

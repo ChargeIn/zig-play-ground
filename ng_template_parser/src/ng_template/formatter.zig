@@ -82,7 +82,7 @@ const Formatter = struct {
             try self.writeSelfClosingTag(html_element, indent);
 
             if (content_whitespace_insenstive) {
-                try self.file_string.concat("\n");
+                try self.file_string.concat("\n\n");
             }
             return;
         }
@@ -242,7 +242,15 @@ const Formatter = struct {
     }
 
     inline fn shouldAutoClose(self: *Formatter, html_element: HtmlElement) bool {
-        return self.options.auto_self_close and html_element.children.items.len == 0 and self.html_elements.get(html_element.name) != true;
+        if (!self.options.auto_self_close or self.html_elements.get(html_element.name) == true) {
+            return false;
+        }
+
+        if (html_element.children.items.len == 0) {
+            return true;
+        }
+
+        return findLastElementWithContent(&html_element.children) == html_element.children.items.len;
     }
 };
 
@@ -369,6 +377,8 @@ fn createHtmlElements(allocator: std.mem.Allocator) StringError!std.StringHashMa
     return map;
 }
 
+// returns the index of the last element that is not empty text
+// in case non is found it returns the length of the child array
 fn findLastElementWithContent(list: *const std.ArrayListUnmanaged(Node)) usize {
     // return index outsize of scope if nothing found
     var lastEl = list.items.len;

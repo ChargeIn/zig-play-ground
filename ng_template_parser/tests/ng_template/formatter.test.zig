@@ -190,3 +190,31 @@ test "should add new line between two children" {
     ;
     try testFormatContent(content, expected_content, options);
 }
+
+test "should auto close custom html elements if empty" {
+    const allocator = std.testing.allocator;
+
+    var options = try Options.init(allocator);
+    defer options.deinit();
+
+    const content =
+        \\<custom-1></custom-1>
+        \\
+        \\<custom-2>   </custom-2>
+        \\
+        \\<custom-3> Some test  </custom-3>
+        \\
+    ;
+
+    const expected_content =
+        \\<custom-1/>
+        \\
+        \\<custom-2/>
+        \\
+        \\<custom-3>
+        \\    Some test
+        \\</custom-3>
+        \\
+    ;
+    try testFormatContent(content, expected_content, options);
+}
