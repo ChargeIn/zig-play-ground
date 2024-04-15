@@ -74,6 +74,60 @@ pub const HtmlElement = struct {
     }
 };
 
+pub const NgIfBaseElement = struct { condition: []const u8, children: std.ArrayListUnmanaged(NgTemplateNode) };
+
+pub const NgIfElement = struct {
+    element: NgIfBaseElement,
+    ng_else_if: std.ArrayListUnmanaged(NgIfBaseElement),
+    ng_else: std.ArrayListUnmanaged(NgIfBaseElement),
+
+    pub fn format(value: NgIfElement, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "NgIfControlElement {{ name: {s}, self_closing: {any}, attributes: [",
+            .{ value.name, value.self_closing },
+        );
+
+        if (value.attributes.items.len > 0) {
+            try writer.print("\n  ", .{});
+
+            for (value.attributes.items, 0..) |attr, i| {
+                try writer.print("  ", .{});
+                try attr.format(fmt, opt, writer);
+                if (i < value.attributes.items.len - 1) {
+                    try writer.print(",\n  ", .{});
+                }
+            }
+            try writer.print("\n", .{});
+        }
+
+        try writer.print("], children: [", .{});
+
+        if (value.children.items.len > 0) {
+            try writer.print("\n", .{});
+
+            for (value.children.items, 0..) |child, i| {
+                try writer.print("  {any}", .{child});
+                if (i < value.children.items.len - 1) {
+                    try writer.print(",\n", .{});
+                }
+            }
+            try writer.print("\n", .{});
+        }
+
+        try writer.print("] }}", .{});
+    }
+
+    pub fn deinit(self: *HtmlElement, allocator: std.mem.Allocator) void {
+        self.attributes.deinit(allocator);
+
+        for (self.children.items) |*child| {
+            child.deinit(allocator);
+        }
+
+        self.children.deinit(allocator);
+    }
+};
+
 pub const HtmlAttributeType = enum {
     static,
     one_way,
@@ -128,6 +182,7 @@ pub const NgTemplateNode = union(enum) {
     cdata: []const u8,
     comment: []const u8,
     text: HtmlTextElement,
+    ng_if: NgIfElement,
     eof,
 
     pub fn format(value: NgTemplateNode, comptime fmt: []const u8, opt: std.fmt.FormatOptions, writer: anytype) !void {

@@ -6,6 +6,7 @@ const std = @import("std");
 const tokens = @import("token.zig");
 const Token = tokens.NgTemplateToken;
 const TextTag = tokens.TextTag;
+const NgControlElement = tokens.NgControlElement;
 
 // For a good referenz see https://github.com/ziglang/zig/blob/master/lib/std/zig/tokenizer.zig
 
@@ -90,7 +91,7 @@ const Lexer = struct {
 
         switch (char) {
             '@' => {
-                return self.parseNgControlElement(allocator);
+                return self.parseNgControlElement();
             },
             '<' => {
                 return self.parseTag(allocator);
@@ -625,28 +626,86 @@ const Lexer = struct {
         // skip '@' char
         self.index += 1;
 
-        const start = self.index;
+        // we need to parse the name of the control element to filter for else if statements
+        var char = self.buffer[self.index];
+        self.index += 1;
 
-        while (true) : (self.index += 1) {
-            const char = self.buffer[self.index];
+        switch (char) {
+            // ng_if,
+            'i' => {
+                char = self.buffer[self.index];
 
-            switch (char) {
-                0 => {
-                    return NgTemplateLexerErrors.EofInNgControlElement;
-                },
-                '(' => {
-                    const name = self.buffer[start..self.index];
+                if (char != 'f') {
+                    return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                }
+                self.index += 1;
+                const condition = try self.parseNgControlCondition();
+                resume NgControlElement.init(.ng_if, condition);
+            },
+            // ng_case,
+            'c' => {
+                if (self.buffer[self.index] != 'a' or
+                    self.buffer[self.index + 1] != 's' or
+                    self.buffer[self.index + 2] != 'e')
+                {
+                    return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                }
+                self.index += 3;
+                const condition = try self.parseNgControlCondition();
+                resume NgControlElement.init(.ng_case, condition);
+            },
+            // ng_default,
+            'd' => {
+                if (self.buffer[self.index] != 'e' or
+                    self.buffer[self.index + 1] != 'f' or
+                    self.buffer[self.index + 2] != 'a' or
+                    self.buffer[self.index + 3] != 'u' or
+                    self.buffer[self.index + 4] != 'l' or
+                    self.buffer[self.index + 5] != 't')
+                {
+                    return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                }
+                self.index += 6;
+                const condition = try self.parseNgControlCondition();
+                resume NgControlElement.init(.ng_default, condition);
+            },
+            // ng_else,
+            // ng_else_if,
+            // ng_empty,
+            'e' => {
+                if (self.buffer[self.index] == 'l') {
+                    if (self.buffer[self.index + 1] != 's' or
+                        self.buffer[self.index + 2] != 'e')
+                    {
+                        return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                    }
+
+                    self.index += 3;
+                    // test for else if
+
+                } else if (self.buffer[self.index] == 'm') {
+                    if (self.buffer[self.index] != 'e' or
+                        self.buffer[self.index + 1] != 'f' or
+                        self.buffer[self.index + 2] != 'a' or
+                        self.buffer[self.index + 3] != 'u' or
+                        self.buffer[self.index + 4] != 'l' or
+                        self.buffer[self.index + 5] != 't')
+                    {
+                        return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                    }
+                    self.index += 6;
                     const condition = try self.parseNgControlCondition();
-                    return tokens.NgControlElement.init(name, condition);
-                },
-                TAB, LINE_FEED, FORM_FEED, SPACE => {
-                    return tokens.NgControlElement.init(self.buffer[start..self.index], "");
-                },
-                '"', '\'', '`', '<', '=' => {
-                    return NgTemplateLexerErrors.UnexpectedCharacterInUnquotedAttributeValue;
-                },
-                else => {},
-            }
+                    resume NgControlElement.init(.ng_default, condition);
+                } else {
+                    return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                }
+            },
+            // ng_for,
+            'f' => {},
+            // ng_defer,
+            'd' => {},
+            // ng_switch,
+            's' => {},
         }
     }
 
@@ -654,10 +713,22 @@ const Lexer = struct {
         // skip opening brackets
         self.index += 1;
 
+        const start = self.index;
+
         while (true) : (self.index += 1) {
             const char = self.buffer[self.index];
 
-            switch (char) {}
+            switch (char) {
+                ')' => {
+                    const value = self.buffer[start..self.index];
+                    self.index += 1;
+                    return value;
+                },
+                0 => {
+                    return NgTemplateLexerErrors.EofInNgControlElement;
+                },
+                else => {},
+            }
         }
     }
 };

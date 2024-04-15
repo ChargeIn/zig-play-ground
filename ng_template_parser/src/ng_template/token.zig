@@ -105,19 +105,63 @@ pub const TextTag = struct {
     }
 };
 
+pub const NgControlType = enum {
+    ng_if,
+    ng_else,
+    ng_else_if,
+    ng_for,
+    ng_empty,
+    ng_defer,
+    ng_switch,
+    ng_case,
+    ng_default,
+};
+
 pub const NgControlElement = struct {
-    name: []const u8,
+    type: NgControlType,
     condition: []const u8,
 
     pub fn format(value: NgControlElement, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        var name = "";
+
+        switch (value.type) {
+            .ng_if => {
+                name = "if";
+            },
+            .ng_else => {
+                name = "else";
+            },
+            .ng_else_if => {
+                name = "else if";
+            },
+            .ng_for => {
+                name = "for";
+            },
+            .ng_empty => {
+                name = "empty";
+            },
+            .ng_defer => {
+                name = "defer";
+            },
+            .ng_switch => {
+                name = "switch";
+            },
+            .ng_case => {
+                name = "case";
+            },
+            .ng_default => {
+                name = "default";
+            },
+        }
+
         try writer.print(
             "NgControlElement {{ type: {s}, condition: \"{s}\" }}",
-            .{ value.name, value.condition },
+            .{ name, value.condition },
         );
     }
 
-    pub fn init(name: []const u8, condition: []const u8) NgControlElement {
-        return .{ .name = name, .condition = condition };
+    pub fn init(type: NgControlType, condition: []const u8) NgControlElement {
+        return .{ .type = type, .condition = condition };
     }
 };
 
