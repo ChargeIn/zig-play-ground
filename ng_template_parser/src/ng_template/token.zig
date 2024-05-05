@@ -160,8 +160,8 @@ pub const NgControlElement = struct {
         );
     }
 
-    pub fn init(type: NgControlType, condition: []const u8) NgControlElement {
-        return .{ .type = type, .condition = condition };
+    pub fn init(control_type: NgControlType, condition: []const u8) NgControlElement {
+        return .{ .type = control_type, .condition = condition };
     }
 };
 

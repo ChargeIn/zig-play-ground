@@ -640,7 +640,7 @@ const Lexer = struct {
                 }
                 self.index += 1;
                 const condition = try self.parseNgControlCondition();
-                resume NgControlElement.init(.ng_if, condition);
+                return .{ .ng_control_elment = NgControlElement.init(.ng_if, condition) };
             },
             // ng_case,
             'c' => {
@@ -652,22 +652,33 @@ const Lexer = struct {
                 }
                 self.index += 3;
                 const condition = try self.parseNgControlCondition();
-                resume NgControlElement.init(.ng_case, condition);
+                return .{ .ng_control_elment = NgControlElement.init(.ng_case, condition) };
             },
             // ng_default,
+            // ng_defer
             'd' => {
-                if (self.buffer[self.index] != 'e' or
-                    self.buffer[self.index + 1] != 'f' or
-                    self.buffer[self.index + 2] != 'a' or
+                if (self.buffer[self.index] != 'e' or self.buffer[self.index + 1] != 'f') {
+                    return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                }
+
+                if (self.buffer[self.index + 2] != 'a' or
                     self.buffer[self.index + 3] != 'u' or
                     self.buffer[self.index + 4] != 'l' or
                     self.buffer[self.index + 5] != 't')
                 {
-                    return NgTemplateLexerErrors.UnsupportedNgControlElement;
+                    self.index += 6;
+                    const condition = try self.parseNgControlCondition();
+                    return .{ .ng_control_elment = NgControlElement.init(.ng_default, condition) };
                 }
-                self.index += 6;
-                const condition = try self.parseNgControlCondition();
-                resume NgControlElement.init(.ng_default, condition);
+
+                if (self.buffer[self.index + 2] != 'f' or
+                    self.buffer[self.index + 3] != 'e' or
+                    self.buffer[self.index + 4] != 'r')
+                {
+                    self.index += 5;
+                    const condition = try self.parseNgControlCondition();
+                    return .{ .ng_control_elment = NgControlElement.init(.ng_defer, condition) };
+                }
             },
             // ng_else,
             // ng_else_if,
@@ -695,17 +706,21 @@ const Lexer = struct {
                     }
                     self.index += 6;
                     const condition = try self.parseNgControlCondition();
-                    resume NgControlElement.init(.ng_default, condition);
+                    return .{ .ng_control_elment = NgControlElement.init(.ng_default, condition) };
                 } else {
                     return NgTemplateLexerErrors.UnsupportedNgControlElement;
                 }
             },
             // ng_for,
             'f' => {},
-            // ng_defer,
-            'd' => {},
             // ng_switch,
             's' => {},
+            0 => {
+                return NgTemplateLexerErrors.EofInNgControlElement;
+            },
+            else => {
+                return NgTemplateLexerErrors.UnsupportedNgControlElement;
+            },
         }
     }
 
